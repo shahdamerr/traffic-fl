@@ -22,10 +22,12 @@ Usage:
 import sys
 import os
 import argparse
+from math import radians, sin, cos, sqrt, atan2
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import numpy as np
+import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
@@ -123,6 +125,13 @@ def main():
                              "Decays linearly to 0 across FL rounds. "
                              "E.g. 0.5 = 50%% teacher forcing in round 1, 0%% in final round. "
                              "Ignored for non-Seq2Seq models. Default: 0.0 (disabled).")
+    parser.add_argument("--hier_alpha",   type=float, default=1.0,
+                        help="Hierarchical mixing coefficient (Level 2 aggregation). "
+                             "1.0 = no cross-cluster sharing (flat CFL, default). "
+                             "0.8 = 80%% own cluster + 20%% neighbor-weighted global.")
+    parser.add_argument("--hier_every",   type=int,   default=5,
+                        help="How often to perform Level 2 hierarchical aggregation. "
+                             "5 = every 5 rounds (default). Lower = more sharing.")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -177,6 +186,41 @@ def main():
     # Build selector
     selector = build_selector(args.selection)
 
+    # Compute cluster centroid distances for hierarchical aggregation
+    cluster_distances = None
+    if args.hier_alpha < 1.0 and args.mode == "clustered":
+        try:
+            locs = pd.read_csv("data/raw/graph_sensor_locations.csv")
+            # Compute cluster centroids
+            centroids = {}
+            for cid, nids in assignments.items():
+                # nids are node indices — look up their GPS coordinates
+                node_indices = [clients[nid].node_id for nid in nids]
+                lats = [locs.iloc[ni]["latitude"] for ni in node_indices]
+                lons = [locs.iloc[ni]["longitude"] for ni in node_indices]
+                centroids[cid] = (np.mean(lats), np.mean(lons))
+
+            # Haversine pairwise distances
+            def _haversine(lat1, lon1, lat2, lon2):
+                R = 6371  # km
+                dlat = radians(lat2 - lat1)
+                dlon = radians(lon2 - lon1)
+                a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+                return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+            cluster_distances = {}
+            cids = sorted(centroids.keys())
+            for i, ci in enumerate(cids):
+                for cj in cids[i+1:]:
+                    d = _haversine(*centroids[ci], *centroids[cj])
+                    cluster_distances[(ci, cj)] = d
+                    cluster_distances[(cj, ci)] = d
+
+            print(f"Hierarchical aggregation: alpha={args.hier_alpha}, "
+                  f"every={args.hier_every} rounds [dist-weighted]")
+        except Exception as e:
+            print(f"Warning: could not compute cluster distances ({e}), using uniform weights")
+
     # Run FL
     trainer = FLTrainer(
         clients=clients,
@@ -187,6 +231,7 @@ def main():
         max_grad_norm=MAX_GRAD_NORM,
         selector=selector,
         seed=args.seed,
+        cluster_distances=cluster_distances,
     )
 
     results = trainer.run(
@@ -197,6 +242,8 @@ def main():
         quality_agg=args.quality_agg,
         top_k=args.top_k,
         tf_start=args.tf_start,
+        hier_alpha=args.hier_alpha,
+        hier_every=args.hier_every,
     )
 
     # Save results
@@ -205,10 +252,11 @@ def main():
     qual_tag   = "_QW" if args.quality_agg else ""
     topk_tag   = f"_K{int(args.top_k*100)}" if args.top_k else ""
     tf_tag     = f"_TF{int(args.tf_start*100)}" if args.tf_start > 0 else ""
+    hier_tag   = f"_H{int(args.hier_alpha*100)}e{args.hier_every}" if args.hier_alpha < 1.0 else ""
     clust_tag  = f"_dtw" if (args.cluster_file and "dtw" in args.cluster_file) else ""
     save_name  = (f"fl_{args.mode}_{args.selection}"
                   f"_R{args.rounds}_{step_tag}_{args.nodes}"
-                  f"{qual_tag}{topk_tag}{tf_tag}{clust_tag}")
+                  f"{qual_tag}{topk_tag}{tf_tag}{hier_tag}{clust_tag}")
     save_path  = f"results/{save_name}.npz"
 
     overall = results["overall"]

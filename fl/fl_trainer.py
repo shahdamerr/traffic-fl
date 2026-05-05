@@ -2,6 +2,12 @@
 
 Orchestrates synchronous FedAvg across clusters.
 Supports both Clustered FL and Global FedAvg (single cluster = all nodes).
+
+Hierarchical aggregation (Level 2):
+    After intra-cluster FedAvg, each cluster model is blended with a
+    distance-weighted global average every N rounds. Nearby clusters
+    share more knowledge, matching real-world congestion propagation.
+    Controlled by hier_alpha (blend ratio) and hier_every (frequency).
 """
 import time
 import copy
@@ -31,7 +37,8 @@ class FLTrainer:
     """
 
     def __init__(self, clients, cluster_assignments, model_kwargs, device, lr,
-                 max_grad_norm=5.0, selector=None, seed=42):
+                 max_grad_norm=5.0, selector=None, seed=42,
+                 cluster_distances=None):
         self.clients = clients
         self.cluster_assignments = cluster_assignments
         self.model_kwargs = model_kwargs
@@ -43,22 +50,119 @@ class FLTrainer:
         # Seeded RNG for reproducible dropout / availability sampling
         self._rng = np.random.default_rng(seed)
 
-        # Initialize one model per cluster (same random init for all nodes in cluster)
+        # Initialize ALL clusters from the SAME random model (standard FL).
+        # This ensures divergence comes only from data heterogeneity,
+        # not from random initialization luck.
+        shared_init = build_model(model_kwargs).state_dict()
         self.cluster_models = {}
         for cid in cluster_assignments:
-            init_model = build_model(model_kwargs)
-            self.cluster_models[cid] = copy.deepcopy(init_model.state_dict())
+            self.cluster_models[cid] = copy.deepcopy(shared_init)
 
         # Communication tracking
         self._param_bytes = count_bytes(self.cluster_models[list(cluster_assignments.keys())[0]])
         self._n_params = count_parameters(self.cluster_models[list(cluster_assignments.keys())[0]])
         self.total_bytes_communicated = 0
 
+        # Hierarchical aggregation: inter-cluster distance weights
+        # cluster_distances: dict[(cid_i, cid_j)] -> distance_km
+        self.cluster_distances = cluster_distances
+        self._hier_weights = None  # computed lazily on first use
+
         # History
         self.round_history = []
 
+    def _compute_hier_weights(self):
+        """Compute per-cluster blending weights from geographic distances.
+
+        For each cluster i, compute how much influence every other cluster j
+        should have, proportional to 1/distance(i, j). Closer clusters share
+        more knowledge, matching real-world congestion propagation.
+
+        Returns:
+            dict[cid -> dict[cid -> float]]: normalized weights per cluster
+        """
+        cids = sorted(self.cluster_assignments.keys())
+        weights = {}
+        for ci in cids:
+            raw = {}
+            for cj in cids:
+                if ci == cj:
+                    continue
+                key = (ci, cj) if (ci, cj) in self.cluster_distances else (cj, ci)
+                dist = self.cluster_distances.get(key, 1.0)
+                raw[cj] = 1.0 / max(dist, 0.1)  # avoid div by zero
+            total = sum(raw.values())
+            weights[ci] = {cj: w / total for cj, w in raw.items()} if total > 0 else {}
+        return weights
+
+    def _hierarchical_aggregate(self, hier_alpha, verbose=False):
+        """Level 2: Inter-cluster hierarchical aggregation.
+
+        Blends each cluster model with a distance-weighted average of the
+        other cluster models. Nearby clusters contribute more.
+
+        cluster_i = alpha * cluster_i + (1-alpha) * weighted_avg(other clusters)
+
+        Args:
+            hier_alpha: float in [0, 1]. 1.0 = no sharing (flat CFL).
+            verbose: print debug info
+        """
+        if self._hier_weights is None:
+            if self.cluster_distances is not None:
+                self._hier_weights = self._compute_hier_weights()
+            else:
+                # Uniform weights (no distance info)
+                cids = sorted(self.cluster_assignments.keys())
+                self._hier_weights = {
+                    ci: {cj: 1.0 / (len(cids) - 1) for cj in cids if cj != ci}
+                    for ci in cids
+                }
+
+        # Blend each cluster with its distance-weighted neighbor average
+        blended_models = {}
+        for cid in self.cluster_models:
+            neighbor_weights = self._hier_weights[cid]
+            if not neighbor_weights:
+                blended_models[cid] = self.cluster_models[cid]
+                continue
+
+            # Compute distance-weighted average of neighbor cluster models
+            neighbor_sd = {}
+            for key in self.cluster_models[cid]:
+                neighbor_sd[key] = torch.zeros_like(
+                    self.cluster_models[cid][key], dtype=torch.float32
+                )
+                for other_cid, w in neighbor_weights.items():
+                    neighbor_sd[key] += self.cluster_models[other_cid][key].float() * w
+
+            # Blend: alpha * own + (1-alpha) * neighbor-weighted global
+            # IMPORTANT: cast back to original dtype to avoid corrupting
+            # non-float buffers (e.g. BatchNorm num_batches_tracked is int64)
+            blended = {}
+            orig_sd = self.cluster_models[cid]
+            for key in orig_sd:
+                orig_dtype = orig_sd[key].dtype
+                if orig_dtype.is_floating_point:
+                    blended[key] = (
+                        hier_alpha * orig_sd[key].float()
+                        + (1 - hier_alpha) * neighbor_sd[key]
+                    ).to(orig_dtype)
+                else:
+                    # Non-float buffers (int64 counters etc.) — keep own value
+                    blended[key] = orig_sd[key].clone()
+            blended_models[cid] = blended
+
+        self.cluster_models = blended_models
+
+        # Track inter-cluster communication cost
+        # Each cluster uploads its model + downloads the blended result
+        self.total_bytes_communicated += (
+            2 * len(self.cluster_models) * self._param_bytes
+        )
+
     def run(self, rounds, local_epochs, eval_every=5, verbose=True,
-            local_steps=None, quality_agg=False, top_k=None, tf_start=0.0):
+            local_steps=None, quality_agg=False, top_k=None, tf_start=0.0,
+            hier_alpha=1.0, hier_every=5):
         """Run the FL training loop.
 
         Args:
@@ -70,17 +174,25 @@ class FLTrainer:
             quality_agg: if True, use quality-weighted FedAvg (Dai et al. 2024)
                          Nodes achieving lower training loss get higher weight.
             top_k:       if set (0<top_k<=1.0), apply Top-K gradient sparsification
-                         before upload (Gao et al. 2024 — FedCE). Reduces
+                         before upload (Gao et al. 2024 -- FedCE). Reduces
                          upload comm cost by (1-top_k)*100%.
             tf_start:    initial teacher forcing ratio for Seq2Seq models.
                          Decays linearly to 0 over all rounds. Only affects
                          GRUSeq2Seq; ignored for GRU/TSMixer. (default: 0.0)
+            hier_alpha:  hierarchical mixing coefficient (Level 2).
+                         1.0 = no cross-cluster sharing (flat CFL, default).
+                         0.8 = 80% own cluster + 20% neighbor-weighted global.
+                         Applied every hier_every rounds.
+            hier_every:  how often to perform Level 2 aggregation.
+                         5 = every 5 rounds (default). Lower = more sharing
+                         but higher communication cost.
 
         Returns:
             dict with final metrics and history
         """
         n_clients = sum(len(nids) for nids in self.cluster_assignments.values())
         n_clusters = len(self.cluster_assignments)
+        use_hier = hier_alpha < 1.0 and n_clusters > 1
 
         if verbose:
             print(f"\n{'='*60}")
@@ -93,7 +205,10 @@ class FLTrainer:
             agg_label = f"QualityWeighted(T=0.5)" if quality_agg else "FedAvg"
             top_k_label = f", Top-K={top_k:.0%}" if top_k else ""
             tf_label = f", TF={tf_start:.0%}->0%" if tf_start > 0 else ""
-            print(f"  Aggregation: {agg_label}{top_k_label}{tf_label}")
+            hier_label = (f", Hier(a={hier_alpha}, every={hier_every})"
+                          if use_hier else "")
+            dist_label = " [dist-weighted]" if (use_hier and self.cluster_distances) else ""
+            print(f"  Aggregation: {agg_label}{top_k_label}{tf_label}{hier_label}{dist_label}")
             print(f"  Model params: {self._n_params:,} ({self._param_bytes:,} bytes)")
             print(f"{'='*60}\n")
 
@@ -196,12 +311,29 @@ class FLTrainer:
                       f"time={elapsed:.1f}s  "
                       f"ETA={remaining/60:.1f}min")
 
-            # Periodic evaluation
+            # Periodic evaluation — runs BEFORE hier sync so it matches
+            # the same model state that the final evaluation will see
+            # (clients are set_weights'd at top of each round from cluster_models)
             if eval_every > 0 and r % eval_every == 0:
+                # Temporarily push current cluster models to clients for eval
+                for cid, node_ids in self.cluster_assignments.items():
+                    for nid in node_ids:
+                        self.clients[nid].set_weights(self.cluster_models[cid])
                 metrics = self.evaluate_all()
                 if verbose:
                     print(f"    >> Eval: MAE={metrics['overall']['mae']:.3f}  "
                           f"60min={metrics['overall']['h60_mae']:.3f}")
+
+            # ── Level 2: Hierarchical inter-cluster aggregation ──────────
+            # Runs AFTER eval so eval reflects the pre-sync model state.
+            # Skipped on the last round: a sync only benefits future training
+            # rounds — firing on round R with no rounds remaining corrupts the
+            # final model before evaluation with no opportunity to recover.
+            if use_hier and r % hier_every == 0 and r < rounds:
+                self._hierarchical_aggregate(hier_alpha, verbose=verbose)
+                if verbose:
+                    print(f"    >> Hier sync (a={hier_alpha}, "
+                          f"{'dist-weighted' if self.cluster_distances else 'uniform'})")
 
         # Final: set all clients to their cluster's final model
         for cid, node_ids in self.cluster_assignments.items():

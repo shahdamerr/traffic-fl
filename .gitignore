@@ -23,3 +23,17 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Cache
+.cache/
+cache/
+*.cache
+.osmnx/
+
+
+
+# Temp/scratch files
+*.txt
+!README.md
+!RUN_GUIDE.md
+!requirements.txt
