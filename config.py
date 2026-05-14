@@ -40,3 +40,11 @@ TSMIXER_DROPOUT  = 0.1
 # Seq2Seq specific (legacy — only used with seq2seq GRU)
 TEACHER_FORCING_START = 0.5
 TEACHER_FORCING_END   = 0.0
+
+# ── Multivariate / time features ───────────────────────────────────────────────
+# Set USE_TIME_FEATURES = True to add sin/cos time-of-day as extra input channels.
+# This changes input_size from 1 → 3 (speed + sin_tod + cos_tod).
+# Requires prepare_data.py to have been run with the updated version
+# (which saves tod_train / tod_val / tod_test alongside X/Y).
+USE_TIME_FEATURES = True           # ← change to True to enable
+N_INPUT_FEATURES  = 3 if USE_TIME_FEATURES else 1

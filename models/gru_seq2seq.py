@@ -42,17 +42,24 @@ class GRUSeq2Seq(nn.Module):
         num_layers: int = 2,
         horizon: int = 12,
         dropout: float = 0.2,
+        input_size: int = 1,
     ):
+        """Args:
+            input_size: number of input features per time step.
+                1 = speed only (default, backward compatible).
+                3 = speed + sin(tod) + cos(tod)  (multivariate mode).
+        """
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.horizon = horizon
+        self.input_size = input_size
 
         # ── Encoder ──────────────────────────────────────────────────────
         # Multi-layer GRU that reads the full input sequence and produces
         # a context hidden state hc capturing temporal patterns.
         self.encoder = nn.GRU(
-            input_size=1,
+            input_size=input_size,
             hidden_size=hidden_size,
             num_layers=num_layers,
             batch_first=True,
@@ -61,7 +68,8 @@ class GRUSeq2Seq(nn.Module):
 
         # ── Decoder ──────────────────────────────────────────────────────
         # GRU that processes one time step at a time (autoregressive).
-        # Same architecture as encoder but used step-by-step.
+        # The decoder always receives only the predicted speed scalar (1 feature)
+        # since we only forecast speed (not time features).
         self.decoder_gru = nn.GRU(
             input_size=1,
             hidden_size=hidden_size,
@@ -99,9 +107,11 @@ class GRUSeq2Seq(nn.Module):
         _, hc = self.encoder(x)
 
         # ── Decode (autoregressive, one step at a time) ──────────────────
-        # First decoder input: last observed speed value from input sequence
-        decoder_input = x[:, -1:, :]    # [B, 1, 1]
-        decoder_hidden = hc             # [num_layers, B, H]
+        # First decoder input: last observed SPEED value from input sequence.
+        # We always take only feature 0 (speed) because the decoder GRU has
+        # input_size=1 — it predicts speed, not time features.
+        decoder_input = x[:, -1:, 0:1]  # [B, 1, 1] — speed only
+        decoder_hidden = hc              # [num_layers, B, H]
 
         outputs = []
         for t in range(self.horizon):

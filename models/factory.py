@@ -13,6 +13,7 @@ from config import (
     MODEL_TYPE,
     HIDDEN_SIZE, NUM_LAYERS, DROPOUT,
     TSMIXER_N_BLOCKS, TSMIXER_FF_DIM, TSMIXER_DROPOUT,
+    N_INPUT_FEATURES,
 )
 
 
@@ -51,6 +52,7 @@ def get_model_kwargs(horizon: int = 12, seq_len: int = 12) -> dict:
             "num_layers": NUM_LAYERS,
             "horizon": horizon,
             "dropout": DROPOUT,
+            "input_size": N_INPUT_FEATURES,
         }
     else:
         raise ValueError(f"Unknown MODEL_TYPE: '{MODEL_TYPE}'. Choose 'tsmixer', 'gru', or 'gru_seq2seq'.")

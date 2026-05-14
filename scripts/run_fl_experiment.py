@@ -31,7 +31,7 @@ import pandas as pd
 import torch
 from torch.utils.data import DataLoader
 
-from config import DEV_NODES, ALL_NODES, BATCH_TRAIN, BATCH_EVAL, MAX_GRAD_NORM, LR
+from config import DEV_NODES, ALL_NODES, BATCH_TRAIN, BATCH_EVAL, MAX_GRAD_NORM, LR, USE_TIME_FEATURES
 from models.factory import get_model_kwargs
 from fl.dataset import NodeTrafficDataset
 from fl.client import FLClient
@@ -46,15 +46,27 @@ def build_clients(proc, scaler, node_list, cluster_labels, model_kwargs, profile
     X_test, Y_test   = proc["X_test"],  proc["Y_test"]
     mean_all, std_all = scaler["mean"], scaler["std"]
 
+    # Load time-of-day indices if time features are enabled
+    if USE_TIME_FEATURES and "tod_train" in proc:
+        tod_train = proc["tod_train"]   # [N_train, seq_len] int32
+        tod_val   = proc["tod_val"]
+        tod_test  = proc["tod_test"]
+        print("[INFO] Time-of-day features ENABLED (input_size=3)")
+    else:
+        tod_train = tod_val = tod_test = None
+        if USE_TIME_FEATURES:
+            print("[WARNING] USE_TIME_FEATURES=True but tod_* not found in processed file. "
+                  "Re-run scripts/prepare_data.py to regenerate. Falling back to speed-only.")
+
     clients = {}
     for nid in node_list:
         profile = profiles.get(nid, {}) if profiles else {}
 
-        tl  = DataLoader(NodeTrafficDataset(X_train, Y_train, nid),
+        tl  = DataLoader(NodeTrafficDataset(X_train, Y_train, nid, tod_train),
                          batch_size=BATCH_TRAIN, shuffle=True,  pin_memory=True)
-        vl  = DataLoader(NodeTrafficDataset(X_val,   Y_val,   nid),
+        vl  = DataLoader(NodeTrafficDataset(X_val,   Y_val,   nid, tod_val),
                          batch_size=BATCH_EVAL,  shuffle=False, pin_memory=True)
-        tel = DataLoader(NodeTrafficDataset(X_test,  Y_test,  nid),
+        tel = DataLoader(NodeTrafficDataset(X_test,  Y_test,  nid, tod_test),
                          batch_size=BATCH_EVAL,  shuffle=False, pin_memory=True)
 
         clients[nid] = FLClient(
@@ -132,6 +144,11 @@ def main():
     parser.add_argument("--hier_every",   type=int,   default=5,
                         help="How often to perform Level 2 hierarchical aggregation. "
                              "5 = every 5 rounds (default). Lower = more sharing.")
+    parser.add_argument("--hier_mode",    choices=["geo", "dtw"], default="geo",
+                        help="How to weight inter-cluster sharing. "
+                             "'geo' = geographic distance (closer clusters share more). "
+                             "'dtw' = DTW pattern similarity (similar clusters share more, "
+                             "consistent with DTW clustering). Default: geo.")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -186,40 +203,87 @@ def main():
     # Build selector
     selector = build_selector(args.selection)
 
-    # Compute cluster centroid distances for hierarchical aggregation
+    # Compute cluster distances for hierarchical aggregation
     cluster_distances = None
     if args.hier_alpha < 1.0 and args.mode == "clustered":
-        try:
-            locs = pd.read_csv("data/raw/graph_sensor_locations.csv")
-            # Compute cluster centroids
-            centroids = {}
-            for cid, nids in assignments.items():
-                # nids are node indices — look up their GPS coordinates
-                node_indices = [clients[nid].node_id for nid in nids]
-                lats = [locs.iloc[ni]["latitude"] for ni in node_indices]
-                lons = [locs.iloc[ni]["longitude"] for ni in node_indices]
-                centroids[cid] = (np.mean(lats), np.mean(lons))
+        if args.hier_mode == "dtw":
+            # ── DTW-based: pattern-similar clusters share more ────────────
+            # Compute mean time series per cluster, then DTW distance between
+            # cluster means. Consistent with DTW clustering motivation.
+            try:
+                X_train = proc["X_train"]  # [N_windows, seq_len, N_sensors]
+                # Build per-cluster mean time series (first 500 windows)
+                sample_len = min(500, X_train.shape[0])
+                raw = X_train[:sample_len, 0, :]  # [sample_len, 207]
 
-            # Haversine pairwise distances
-            def _haversine(lat1, lon1, lat2, lon2):
-                R = 6371  # km
-                dlat = radians(lat2 - lat1)
-                dlon = radians(lon2 - lon1)
-                a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
-                return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+                cluster_means = {}
+                for cid, nids in assignments.items():
+                    # Average time series of all nodes in this cluster
+                    cluster_means[cid] = raw[:, nids].mean(axis=1)  # [sample_len]
 
-            cluster_distances = {}
-            cids = sorted(centroids.keys())
-            for i, ci in enumerate(cids):
-                for cj in cids[i+1:]:
-                    d = _haversine(*centroids[ci], *centroids[cj])
-                    cluster_distances[(ci, cj)] = d
-                    cluster_distances[(cj, ci)] = d
+                # Simple DTW between cluster mean series
+                def _dtw_dist(s1, s2):
+                    """Fast DTW for short series."""
+                    n, m = len(s1), len(s2)
+                    dtw = np.full((n + 1, m + 1), np.inf)
+                    dtw[0, 0] = 0.0
+                    for i in range(1, n + 1):
+                        for j in range(1, m + 1):
+                            cost = abs(s1[i-1] - s2[j-1])
+                            dtw[i, j] = cost + min(dtw[i-1, j], dtw[i, j-1], dtw[i-1, j-1])
+                    return dtw[n, m]
 
-            print(f"Hierarchical aggregation: alpha={args.hier_alpha}, "
-                  f"every={args.hier_every} rounds [dist-weighted]")
-        except Exception as e:
-            print(f"Warning: could not compute cluster distances ({e}), using uniform weights")
+                cluster_distances = {}
+                cids = sorted(cluster_means.keys())
+                for i, ci in enumerate(cids):
+                    for cj in cids[i+1:]:
+                        d = _dtw_dist(cluster_means[ci], cluster_means[cj])
+                        cluster_distances[(ci, cj)] = d
+                        cluster_distances[(cj, ci)] = d
+
+                print(f"Hierarchical aggregation: alpha={args.hier_alpha}, "
+                      f"every={args.hier_every} rounds [dtw-weighted]")
+                # Print inter-cluster DTW distances for debugging
+                for i, ci in enumerate(cids):
+                    for cj in cids[i+1:]:
+                        print(f"  DTW dist({ci},{cj}) = {cluster_distances[(ci,cj)]:.1f}")
+
+            except Exception as e:
+                print(f"Warning: DTW hier weights failed ({e}), using uniform weights")
+
+        else:
+            # ── Geographic: nearby clusters share more ────────────────────
+            try:
+                locs = pd.read_csv("data/raw/graph_sensor_locations.csv")
+                # Compute cluster centroids
+                centroids = {}
+                for cid, nids in assignments.items():
+                    # nids are node indices — look up their GPS coordinates
+                    node_indices = [clients[nid].node_id for nid in nids]
+                    lats = [locs.iloc[ni]["latitude"] for ni in node_indices]
+                    lons = [locs.iloc[ni]["longitude"] for ni in node_indices]
+                    centroids[cid] = (np.mean(lats), np.mean(lons))
+
+                # Haversine pairwise distances
+                def _haversine(lat1, lon1, lat2, lon2):
+                    R = 6371  # km
+                    dlat = radians(lat2 - lat1)
+                    dlon = radians(lon2 - lon1)
+                    a = sin(dlat/2)**2 + cos(radians(lat1))*cos(radians(lat2))*sin(dlon/2)**2
+                    return R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+                cluster_distances = {}
+                cids = sorted(centroids.keys())
+                for i, ci in enumerate(cids):
+                    for cj in cids[i+1:]:
+                        d = _haversine(*centroids[ci], *centroids[cj])
+                        cluster_distances[(ci, cj)] = d
+                        cluster_distances[(cj, ci)] = d
+
+                print(f"Hierarchical aggregation: alpha={args.hier_alpha}, "
+                      f"every={args.hier_every} rounds [dist-weighted]")
+            except Exception as e:
+                print(f"Warning: could not compute cluster distances ({e}), using uniform weights")
 
     # Run FL
     trainer = FLTrainer(
@@ -252,7 +316,7 @@ def main():
     qual_tag   = "_QW" if args.quality_agg else ""
     topk_tag   = f"_K{int(args.top_k*100)}" if args.top_k else ""
     tf_tag     = f"_TF{int(args.tf_start*100)}" if args.tf_start > 0 else ""
-    hier_tag   = f"_H{int(args.hier_alpha*100)}e{args.hier_every}" if args.hier_alpha < 1.0 else ""
+    hier_tag   = f"_H{int(args.hier_alpha*100)}e{args.hier_every}{'d' if args.hier_mode == 'dtw' else ''}" if args.hier_alpha < 1.0 else ""
     clust_tag  = f"_dtw" if (args.cluster_file and "dtw" in args.cluster_file) else ""
     save_name  = (f"fl_{args.mode}_{args.selection}"
                   f"_R{args.rounds}_{step_tag}_{args.nodes}"
