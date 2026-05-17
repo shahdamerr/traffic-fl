@@ -201,7 +201,7 @@ def main():
 
     print("=" * 60)
     print("  DTW-Based Traffic Pattern Clustering")
-    print(f"  Method: DTW distance → MDS embedding → KMeans")
+    print(f"  Method: DTW distance -> MDS embedding -> KMeans")
     print(f"  Reference: Feng et al. 2024 (ISPRS Int. J. Geo-Inf.)")
     print(f"  N clusters={args.n_clusters}  |  Sample length={args.sample_len}")
     print("=" * 60)

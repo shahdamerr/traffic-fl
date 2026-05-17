@@ -37,3 +37,5 @@ cache/
 !README.md
 !RUN_GUIDE.md
 !requirements.txt
+data-PemsBay/pems-bay.h5
+data-PemsBay/processed/

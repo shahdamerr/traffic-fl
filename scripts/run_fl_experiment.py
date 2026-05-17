@@ -149,6 +149,10 @@ def main():
                              "'geo' = geographic distance (closer clusters share more). "
                              "'dtw' = DTW pattern similarity (similar clusters share more, "
                              "consistent with DTW clustering). Default: geo.")
+    parser.add_argument("--lr_decay",     type=str,   default=None,
+                        help="Step-wise LR decay schedule as comma-separated round:lr pairs. "
+                             "E.g. '40:0.00025,60:0.0001' means LR drops to 0.00025 at "
+                             "round 40 and to 0.0001 at round 60. Default: None (constant LR).")
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -298,6 +302,15 @@ def main():
         cluster_distances=cluster_distances,
     )
 
+    # Parse LR schedule
+    lr_schedule = None
+    if args.lr_decay:
+        lr_schedule = []
+        for pair in args.lr_decay.split(","):
+            rnd, lr_val = pair.strip().split(":")
+            lr_schedule.append((int(rnd), float(lr_val)))
+        print(f"LR schedule: {lr_schedule}")
+
     results = trainer.run(
         rounds=args.rounds,
         local_epochs=args.local_epochs,
@@ -308,6 +321,7 @@ def main():
         tf_start=args.tf_start,
         hier_alpha=args.hier_alpha,
         hier_every=args.hier_every,
+        lr_schedule=lr_schedule,
     )
 
     # Save results

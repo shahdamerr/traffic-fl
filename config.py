@@ -46,5 +46,5 @@ TEACHER_FORCING_END   = 0.0
 # This changes input_size from 1 → 3 (speed + sin_tod + cos_tod).
 # Requires prepare_data.py to have been run with the updated version
 # (which saves tod_train / tod_val / tod_test alongside X/Y).
-USE_TIME_FEATURES = True           # ← change to True to enable
+USE_TIME_FEATURES = True            # ← ENABLED for best config
 N_INPUT_FEATURES  = 3 if USE_TIME_FEATURES else 1

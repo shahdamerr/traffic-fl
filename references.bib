@@ -1,80 +1,123 @@
+% ============================================================
+% Core FL
+% ============================================================
 @inproceedings{mcmahan2017,
   title={Communication-efficient learning of deep networks from decentralized data},
   author={McMahan, Brendan and Moore, Eider and Ramage, Daniel and Hampson, Seth and y Arcas, Blaise Aguera},
-  booktitle={Artificial intelligence and statistics},
+  booktitle={Artificial Intelligence and Statistics},
   pages={1273--1282},
   year={2017},
   organization={PMLR}
 }
 
-@article{zhu2025cmba,
-  title={CMBA-FL: Communication-mitigated and blockchain-assisted federated learning for traffic flow predictions},
-  author={Zhu, Kaiyin and Lu, Mingming and Li, Haifeng and Xiong, Neal N. and He, Wenyong},
-  journal={Digital Communications and Networks},
-  volume={11},
-  pages={724--733},
-  year={2025},
-  publisher={Elsevier}
+@article{kairouz2021,
+  title={Advances and open problems in federated learning},
+  author={Kairouz, Peter and McMahan, H. Brendan and Avent, Brendan and Bellet, Aur{\'e}lien and Bennis, Mehdi and Bhagoji, Arjun Nitin and others},
+  journal={Foundations and Trends in Machine Learning},
+  volume={14},
+  number={1--2},
+  pages={1--210},
+  year={2021}
 }
 
-@article{feng2024,
-  title={Traffic Flow Prediction Based on Federated Learning and Spatio-Temporal GNNs},
-  author={Feng, [Author Names from your literature review]},
-  journal={ISPRS International Journal of Geo-Information},
-  volume={13},
-  number={210},
-  year={2024},
+% ============================================================
+% Non-IID / Data Heterogeneity
+% ============================================================
+@article{li2020fedprox,
+  title={Federated optimization in heterogeneous networks},
+  author={Li, Tian and Sahu, Anit Kumar and Zaheer, Manzil and Sanjabi, Maziar and Talwalkar, Ameet and Smith, Virginia},
+  journal={Proceedings of Machine Learning and Systems},
+  volume={2},
+  pages={429--450},
+  year={2020}
+}
+
+@inproceedings{karimireddy2020,
+  title={SCAFFOLD: Stochastic controlled averaging for federated learning},
+  author={Karimireddy, Sai Praneeth and Kale, Satyen and Mohri, Mehryar and Reddi, Sashank and Stich, Sebastian and Suresh, Ananda Theertha},
+  booktitle={International Conference on Machine Learning},
+  pages={5132--5143},
+  year={2020},
+  organization={PMLR}
+}
+
+@inproceedings{li2021moon,
+  title={Model contrastive federated learning},
+  author={Li, Qinbin and He, Bingsheng and Song, Dawn},
+  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
+  pages={10713--10722},
+  year={2021}
+}
+
+@article{cha2025,
+  title={Addressing non-{IID} with data quantity skew in federated learning via {MAP} estimation},
+  author={Cha, Hyeonbeen and Chang, Woojin},
+  journal={Information},
+  volume={16},
+  number={861},
+  year={2025},
   publisher={MDPI}
 }
 
-@article{gao2024fedce,
-  title={FedCE: A Communication-Efficient Federated Learning Framework for Wireless Traffic Prediction},
-  author={Gao, Fuwei and [Other Authors]},
-  journal={[Journal Name from your literature review]},
-  year={2024}
-}
-
-@article{dai2024,
-  title={Quality-weighted Federated Learning Aggregation [Update with exact title]},
-  author={Dai, [Author Names from your literature review]},
-  journal={[Journal Name from your literature review]},
-  year={2024}
-}
-
+% ============================================================
+% Traffic Flow Prediction – Traditional & DL
+% ============================================================
 @article{jin2008,
-  title={Traffic flow prediction using Principal Component Analysis and Support Vector Regression},
-  author={Jin, [Author Names from CMBA-FL paper]},
-  journal={[Update Journal from CMBA-FL]},
-  year={2008}
+  title={Simultaneous prediction of network traffic flow based on {PCA-SVR}},
+  author={Jin, Shanshan and Wang, Dianhai and Xu, Chengcheng and Ma, Dongfang},
+  journal={Advances in Neural Networks -- ISNN 2008},
+  pages={1022--1031},
+  year={2008},
+  publisher={Springer}
 }
 
 @article{tang2017,
-  title={Traffic flow prediction using fuzzy C-mean neural network and SVR},
-  author={Tang, [Author Names from CMBA-FL paper]},
-  journal={[Update Journal from CMBA-FL]},
-  year={2017}
+  title={An improved fuzzy neural network for traffic speed prediction considering periodic characteristic},
+  author={Tang, Jinjun and Chen, Xinqiang and Hu, Zhixiang and Zong, Fang and Han, Chunhui and Li, Lanshan},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  volume={18},
+  number={9},
+  pages={2340--2350},
+  year={2017},
+  publisher={IEEE}
+}
+
+@article{arima1970,
+  title={Time series analysis: Forecasting and control},
+  author={Box, George E. P. and Jenkins, Gwilym M.},
+  journal={Holden-Day},
+  year={1970}
+}
+
+@article{var2005,
+  title={Vector autoregressive models for multivariate time series},
+  author={L{\"u}tkepohl, Helmut},
+  journal={New Introduction to Multiple Time Series Analysis},
+  pages={11--74},
+  year={2005},
+  publisher={Springer}
 }
 
 @article{zhang2017,
   title={Deep spatio-temporal residual networks for citywide crowd flows prediction},
   author={Zhang, Junbo and Zheng, Yu and Qi, Dekang},
-  booktitle={Thirty-first AAAI conference on artificial intelligence},
+  booktitle={Thirty-First AAAI Conference on Artificial Intelligence},
   year={2017}
 }
 
 @article{hochreiter1997,
   title={Long short-term memory},
   author={Hochreiter, Sepp and Schmidhuber, J{\"u}rgen},
-  journal={Neural computation},
+  journal={Neural Computation},
   volume={9},
   number={8},
   pages={1735--1780},
   year={1997},
-  publisher={MIT press}
+  publisher={MIT Press}
 }
 
 @article{cho2014,
-  title={Learning phrase representations using RNN encoder-decoder for statistical machine translation},
+  title={Learning phrase representations using {RNN} encoder-decoder for statistical machine translation},
   author={Cho, Kyunghyun and Van Merri{\"e}nboer, Bart and Gulcehre, Caglar and Bahdanau, Dzmitry and Bougares, Fethi and Schwenk, Holger and Bengio, Yoshua},
   journal={arXiv preprint arXiv:1406.1078},
   year={2014}
@@ -83,18 +126,31 @@
 @article{li2018,
   title={Diffusion convolutional recurrent neural network: Data-driven traffic forecasting},
   author={Li, Yaguang and Yu, Rose and Shahabi, Cyrus and Liu, Yan},
-  journal={arXiv preprint arXiv:1707.01926},
-  year={2017}
+  journal={International Conference on Learning Representations (ICLR)},
+  year={2018}
 }
 
-@article{guo2019,
+@inproceedings{guo2019,
   title={Attention based spatial-temporal graph convolutional networks for traffic flow forecasting},
   author={Guo, Shengnan and Lin, Youfang and Feng, Ning and Song, Chao and Wan, Huaiyu},
-  booktitle={Proceedings of the AAAI conference on artificial intelligence},
+  booktitle={Proceedings of the AAAI Conference on Artificial Intelligence},
   volume={33},
   number={01},
   pages={922--929},
   year={2019}
+}
+
+% ============================================================
+% FL for Traffic Prediction
+% ============================================================
+@article{zhu2025cmba,
+  title={{CMBA-FL}: Communication-mitigated and blockchain-assisted federated learning for traffic flow predictions},
+  author={Zhu, Kaiyin and Lu, Mingming and Li, Haifeng and Xiong, Neal N. and He, Wenyong},
+  journal={Digital Communications and Networks},
+  volume={11},
+  pages={724--733},
+  year={2025},
+  publisher={Elsevier}
 }
 
 @article{liu2020fedgru,
@@ -109,68 +165,92 @@
 }
 
 @article{meng2021cnfgnn,
-  title={Cross-node federated graph neural network for spatio-temporal data prediction},
-  author={Meng, [Author Names from CMBA-FL]},
-  journal={[Update Journal from CMBA-FL]},
+  title={Cross-node federated graph neural network for spatio-temporal data modeling},
+  author={Meng, Chuizheng and Rambhatla, Sirisha and Liu, Yan},
+  booktitle={Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery and Data Mining},
+  pages={1202--1211},
   year={2021}
 }
 
-@article{chong2025,
-  title={Federated Learning for Intelligent Transportation Systems: Use Cases, Open Challenges, and Opportunities},
-  author={Chong, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2025}
+@article{qi2023fedagcn,
+  title={{FedAGCN}: A traffic flow prediction framework based on federated learning and asynchronous graph convolutional network},
+  author={Qi, Tao and Chen, Lingqiang and Li, Guanghui and Li, Yijing and Wang, Chenshu},
+  journal={Applied Soft Computing},
+  volume={138},
+  pages={110175},
+  year={2023},
+  publisher={Elsevier}
 }
 
-@article{kairouz2021,
-  title={Advances and Open Problems in Federated Learning},
-  author={Kairouz, Peter and others},
-  journal={Foundations and Trends in Machine Learning},
-  year={2021}
+@article{yaqub2025flagcn,
+  title={Predicting traffic flow with federated learning and graph neural with asynchronous computations network},
+  author={Yaqub, Muhammad and Ahmad, Shahzad and Manan, Malik Abdul and Pathan, Muhammad Salman and He, Lan},
+  journal={Transportation Engineering},
+  volume={20},
+  pages={100310},
+  year={2025},
+  publisher={Elsevier}
 }
 
-@article{li2020fedprox,
-  title={Federated Optimization in Heterogeneous Networks},
-  author={Li, Tian and Sahu, Anit Kumar and Zaheer, Manzil and Sanjabi, Maziar and Talwalkar, Ameet and Smith, Virginia},
-  journal={Proceedings of Machine Learning and Systems},
-  volume={2},
-  pages={429--450},
-  year={2020}
+@article{li2025fedgdan,
+  title={{FedGDAN}: Privacy-preserving traffic flow prediction via federated graph diffusion attention networks},
+  author={Li, Yuanhui and Mi, Bo and Zeng, Ran},
+  journal={Scientific Reports},
+  volume={15},
+  pages={24963},
+  year={2025},
+  publisher={Springer Nature}
 }
 
-@inproceedings{karimireddy2020,
-  title={SCAFFOLD: Stochastic Controlled Averaging for Federated Learning},
-  author={Karimireddy, Sai Praneeth and Kale, Satyen and Mohri, Mehryar and Reddi, Sashank and Stich, Sebastian and Suresh, Ananda Theertha},
-  booktitle={International Conference on Machine Learning},
-  pages={5132--5143},
-  year={2020},
-  organization={PMLR}
+@article{wang2024fedgm,
+  title={Federated meta-learning on graph for traffic flow prediction},
+  author={Wang, Xinyu and Wang, Chaoqun and Li, Guibing and Zheng, Zhuoye},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  volume={25},
+  number={10},
+  pages={19526--19537},
+  year={2024},
+  publisher={IEEE}
 }
 
-@inproceedings{li2021moon,
-  title={Model Contrastive Federated Learning},
-  author={Li, Qinbin and He, Bingsheng and Song, Dawn},
-  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  pages={10713--10722},
-  year={2021}
+% ============================================================
+% Clustering-Based FL
+% ============================================================
+@article{feng2024,
+  title={Traffic flow prediction based on federated learning and spatio-temporal graph neural networks},
+  author={Feng, Jianming and Du, Jiangang and Li, Guojiang and Li, Bing},
+  journal={ISPRS International Journal of Geo-Information},
+  volume={13},
+  number={7},
+  pages={210},
+  year={2024},
+  publisher={MDPI}
 }
 
-@article{cha2025,
-  title={Addressing Non-IID with Data Quantity Skew in Federated Learning},
-  author={Cha, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2025}
+@article{li2025fedstdn,
+  title={{FedSTDN}: A federated learning-enabled spatial-temporal prediction model for wireless traffic prediction},
+  author={Li, Zhuo and Zhang, Zihe and Zhang, Yibo and Jiang, Tong},
+  journal={IEEE Transactions on Wireless Communications},
+  year={2025},
+  publisher={IEEE}
 }
 
-@article{huang2024,
-  title={Fairness-Aware Aggregation for FL},
-  author={Huang, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2024}
+% ============================================================
+% Communication Efficiency
+% ============================================================
+@article{gao2024fedce,
+  title={{FedCE}: A communication-efficient federated learning framework for wireless traffic prediction},
+  author={Gao, Fuwei and Chen, Hao and Shen, Guojiang and Tang, Bofeng and Kong, Xiangjie},
+  journal={Mathematics},
+  volume={12},
+  number={16},
+  pages={2539},
+  year={2024},
+  publisher={MDPI}
 }
 
 @inproceedings{lai2021oort,
-  title={Oort: Efficient Federated Learning via Guided Participant Selection},
+  title={Oort: Efficient federated learning via guided participant selection},
   author={Lai, Fan and Zhu, Xiangfeng and Madhyastha, Harsha V and Chowdhury, Mosharaf},
   booktitle={15th USENIX Symposium on Operating Systems Design and Implementation (OSDI 21)},
   pages={269--282},
@@ -178,50 +258,149 @@
 }
 
 @article{albelaihi2025,
-  title={Mobility Prediction and Resource-Aware Client Selection for FL in IoT},
-  author={Albelaihi, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2025}
+  title={Mobility-aware client selection strategy for federated learning in {IoT}},
+  author={Albelaihi, Rana},
+  journal={Future Internet},
+  volume={17},
+  number={3},
+  pages={109},
+  year={2025},
+  publisher={MDPI}
 }
 
-@article{li2025fedstdn,
-  title={FedSTDN: A FL-Enabled Spatial-Temporal Prediction Model for Wireless Traffic},
-  author={Li, Z. and others},
-  journal={[Journal Name]},
-  year={2025}
+@article{chen2025bafls,
+  title={An active client selection scheme based on blockchain for federated learning in shipping},
+  author={Chen, Liang and Liu, Xiaohan and Zhu, Jinghua and Wang, Jinghua},
+  journal={IEEE Internet of Things Journal},
+  volume={12},
+  number={11},
+  pages={20669--20685},
+  year={2025},
+  publisher={IEEE}
+}
+
+@article{wang2024cedfl,
+  title={Accelerating decentralized federated learning with probabilistic communication in heterogeneous edge computing},
+  author={Wang, Tao and Liang, Yuying and Jia, Weijia and Arif, Muhammad},
+  journal={IEEE Transactions on Parallel and Distributed Systems},
+  volume={35},
+  number={12},
+  pages={2437--2451},
+  year={2024},
+  publisher={IEEE}
+}
+
+% ============================================================
+% Hierarchical / Multi-Server FL
+% ============================================================
+@article{ma2025asafl,
+  title={Adaptive segmentation enhanced asynchronous federated learning for sustainable intelligent transportation systems},
+  author={Ma, Xiao and Xu, Qichao and Zhou, Huan and others},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  volume={26},
+  number={6},
+  pages={6649--6662},
+  year={2025},
+  publisher={IEEE}
 }
 
 @article{mazloomi2025,
-  title={A Novel Multi-Server Federated Learning Framework in Vehicular Edge Computing},
-  author={Mazloomi, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2025}
+  title={A novel multi-server federated learning framework in vehicular edge computing},
+  author={Mazloomi, Nazer and Toghchi, Sina Abbasi and Shojaeinasab, Amir and Thai, My T.},
+  journal={Future Internet},
+  volume={17},
+  number={7},
+  pages={315},
+  year={2025},
+  publisher={MDPI}
 }
 
-@inproceedings{geyer2017,
-  title={Differentially Private Federated Learning: A Client Level Perspective},
-  author={Geyer, Robin C and Klein, Tassilo and Nabi, Moin},
-  booktitle={NIPS Privacy in Machine Learning Workshop},
-  year={2017}
+% ============================================================
+% Quality-Weighted Aggregation / Client Reputation
+% ============================================================
+@article{dai2024,
+  title={Road network traffic flow prediction: A personalized federated learning method based on client reputation},
+  author={Dai, Guowen and Tang, Jinjun and Zeng, Jie and Hu, Chen and Zhao, Chuyun},
+  journal={Computers and Electrical Engineering},
+  volume={120},
+  pages={109678},
+  year={2024},
+  publisher={Elsevier}
 }
 
-@article{tahir2025,
-  title={FLAA-V2V: Privacy-Preserving FL with Adaptive Model Aggregation for Efficient V2V Communication},
-  author={Tahir, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2025}
+% ============================================================
+% FL Surveys for ITS
+% ============================================================
+@article{chong2025,
+  title={Federated learning for intelligent transportation systems: Use cases, open challenges, and opportunities},
+  author={Chong, Chun Yong and Yusuf, Siti Hafizah Ab Hamid and Ong, Sew Sun},
+  journal={IEEE Intelligent Transportation Systems Magazine},
+  volume={17},
+  number={3},
+  pages={18--39},
+  year={2025},
+  publisher={IEEE}
 }
 
-@article{lu2020,
-  title={Blockchain-Empowered Asynchronous Federated Learning for IoV},
-  author={Lu, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2020}
+% ============================================================
+% Federated Graph Learning
+% ============================================================
+@article{zhang2024fedgl,
+  title={Position-aware structural knowledge sharing-based federated graph learning for intelligent transportation systems},
+  author={Zhang, Zhaoyang and Yang, Qiang and Li, Guoqiang and others},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  year={2024},
+  publisher={IEEE}
 }
 
-@article{li2025dtbfl,
-  title={Resilient Federated Learning for Vehicular Networks: A Digital Twin and Blockchain-Empowered Approach},
-  author={Li, [Author Names from literature review]},
-  journal={[Journal Name]},
-  year={2025}
+% ============================================================
+% Non-IID FL with dynamic regularization
+% ============================================================
+@article{huang2024,
+  title={Fairness-aware aggregation for federated learning in autonomous vehicles},
+  author={Huang, Yifan and others},
+  journal={IEEE Access},
+  year={2024},
+  publisher={IEEE}
+}
+
+% ============================================================
+% METR-LA Dataset
+% ============================================================
+@misc{metrla2017,
+  title={{METR-LA} traffic speed dataset},
+  author={Li, Yaguang and Yu, Rose and Shahabi, Cyrus and Liu, Yan},
+  year={2017},
+  note={207 sensors on the Los Angeles highway network, 4 months of 5-minute interval data}
+}
+
+@article{lin2017intelligent,
+  title={An intelligent transportation system based on connected vehicles},
+  author={Lin, Dongyao and Tang, Jinjun and others},
+  journal={IEEE Access},
+  volume={5},
+  pages={14792--14806},
+  year={2017},
+  publisher={IEEE}
+}
+
+@article{luo2021spatial,
+  title={Spatial-temporal data mining for traffic-related applications},
+  author={Luo, Xin and Li, Dan and Yang, Yu and Zhang, Shuai},
+  journal={IEEE Transactions on Intelligent Transportation Systems},
+  volume={22},
+  number={5},
+  pages={2616--2630},
+  year={2021},
+  publisher={IEEE}
+}
+
+@article{dai2020hybrid,
+  title={A hybrid deep learning model for real-time traffic flow prediction},
+  author={Dai, Guowen and Ma, Changxi and Xu, Xuecai},
+  journal={Applied Intelligence},
+  volume={50},
+  pages={2891--2909},
+  year={2020},
+  publisher={Springer}
 }

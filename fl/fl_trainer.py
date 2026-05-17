@@ -162,7 +162,7 @@ class FLTrainer:
 
     def run(self, rounds, local_epochs, eval_every=5, verbose=True,
             local_steps=None, quality_agg=False, top_k=None, tf_start=0.0,
-            hier_alpha=1.0, hier_every=5):
+            hier_alpha=1.0, hier_every=5, lr_schedule=None):
         """Run the FL training loop.
 
         Args:
@@ -186,6 +186,10 @@ class FLTrainer:
             hier_every:  how often to perform Level 2 aggregation.
                          5 = every 5 rounds (default). Lower = more sharing
                          but higher communication cost.
+            lr_schedule: optional list of (round, lr) tuples for step-wise
+                         LR decay. E.g. [(40, 0.00025), (60, 0.0001)] means
+                         lr drops to 0.00025 at round 40 and 0.0001 at round 60.
+                         If None, lr stays constant throughout training.
 
         Returns:
             dict with final metrics and history
@@ -214,10 +218,22 @@ class FLTrainer:
 
         start_time = time.time()
 
+        # Pre-sort LR schedule for efficient lookup
+        _lr_milestones = sorted(lr_schedule, key=lambda x: x[0]) if lr_schedule else []
+
         for r in range(1, rounds + 1):
             round_start = time.time()
             round_losses = []
             total_selected = 0
+
+            # ── Step-wise LR decay ────────────────────────────────────────
+            for milestone_round, milestone_lr in _lr_milestones:
+                if r == milestone_round:
+                    old_lr = self.lr
+                    self.lr = milestone_lr
+                    if verbose:
+                        print(f"    >> LR decay: {old_lr} -> {self.lr} at round {r}")
+                    break
 
             # Compute teacher forcing ratio for this round (decays linearly)
             tf_ratio = tf_start * (1.0 - (r - 1) / max(rounds - 1, 1)) if tf_start > 0 else 0.0
