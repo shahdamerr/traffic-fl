@@ -1,0 +1,250 @@
+\chapter{Results and Discussion}
+\label{ch:results}
+This chapter presents the experimental results of the proposed Hierarchical Federated Learning framework on the METR-LA dataset. Section~\ref{sec:ablation_results} reports the cumulative ablation study that isolates the contribution of each framework component. Section~\ref{sec:horizon_analysis} analyzes prediction accuracy across different forecast horizons. Section~\ref{sec:cluster_analysis} examines per-cluster performance variations. Section~\ref{sec:lit_comparison} compares the framework against published centralized and federated baselines. Section~\ref{sec:comm_analysis} presents the communication cost analysis. Section~\ref{sec:pemsbay_results} reports cross-dataset validation on PEMS-BAY. Section~\ref{sec:discussion} discusses the key findings and limitations.
+\section{Ablation Study Results}
+\label{sec:ablation_results}
+The proposed framework was evaluated through a cumulative ablation study on the METR-LA dataset (207 sensors, 60 communication rounds for the final configuration). Each row in Table~\ref{tab:ablation_results} adds one component to the previous configuration, isolating its individual contribution. All runs used the same preprocessed data, random seed, and GRU Seq2Seq architecture described in Chapter~\ref{ch:implementation}.
+\begin{table}[H]
+\centering
+\caption{Cumulative ablation study results on METR-LA. Bold indicates the best result in each column. $\Delta$ shows the relative change in MAE compared to the previous row.}
+\label{tab:ablation_results}
+\small
+\begin{tabular}{c l c c c c c}
+\hline
+\textbf{Run} & \textbf{Configuration} & \textbf{MAE} & \textbf{RMSE} & \textbf{MAPE (\%)} & \textbf{Comm (GB)} & \textbf{$\Delta$ MAE} \\
+\hline
+A & Global FedAvg & 3.832 & 7.171 & 11.11 & 24.3 & --- \\
+B & + DTW Clustering & 3.753 & 7.109 & 10.74 & 24.3 & $-$2.1\% \\
+C & + QW + Hier Agg (geo) & 3.722 & 7.093 & 10.51 & 24.5 & $-$0.8\% \\
+D & + Adaptive Selection & 3.736 & 7.096 & 10.63 & 21.5 & +0.4\% \\
+E & + Time-of-Day Features & 3.700 & 6.841 & 10.74 & 21.5 & $-$1.0\% \\
+F & + DTW Hier Weighting & 3.696 & 6.840 & 10.67 & 21.5 & $-$0.1\% \\
+G & + LR Decay + $\alpha{=}0.9$ & \textbf{3.676} & \textbf{6.759} & \textbf{10.46} & 25.8 & $-$0.5\% \\
+\hline
+\multicolumn{2}{l}{\textit{Total improvement (A $\to$ G)}} & \multicolumn{3}{c}{} & & $-$4.1\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/ablation_mae_chart.png}
+\caption{Overall MAE across cumulative ablation configurations on METR-LA.}
+\label{fig:ablation_mae}
+\end{figure}
+
+The ablation study reveals several important findings:
+\begin{itemize}
+    \item \textbf{DTW Clustering (A $\to$ B):} Grouping sensors by temporal pattern similarity rather than training a single global model yields a 2.1\% MAE improvement (3.832 $\to$ 3.753). This supports the claim that reducing non-IID divergence through pattern-aware clustering allows per-cluster models to specialize in similar traffic behaviors.
+    \item \textbf{Quality-Weighted and Hierarchical Aggregation (B $\to$ C):} Adding quality-weighted intra-cluster aggregation and geographic-distance-based inter-cluster knowledge sharing provides a further 0.8\% improvement (3.753 $\to$ 3.722). Quality weighting ensures that clients with lower local training loss contribute more to the cluster model, while hierarchical synchronization enables beneficial knowledge transfer between clusters.
+    \item \textbf{Adaptive Client Selection (C $\to$ D):} Introducing adaptive reliability-based client selection increases MAE slightly by 0.4\% (3.722 $\to$ 3.736). This is an intentional trade-off: adaptive selection reduces communication cost by 12.2\% (24.5 $\to$ 21.5~GB) by excluding unreliable clients, at the cost of a marginal accuracy reduction. In a communication-efficiency-focused framework, this trade-off is desirable.
+    \item \textbf{Time-of-Day Features (D $\to$ E):} Adding sinusoidal time-of-day encodings to the input features produces a 1.0\% improvement (3.736 $\to$ 3.700) and notably reduces the RMSE from 7.096 to 6.841. The cyclical temporal features help the model distinguish between peak and off-peak traffic patterns, improving predictions at longer horizons where diurnal patterns are more informative.
+    \item \textbf{DTW-Based Hierarchical Weighting (E $\to$ F):} Replacing geographic-distance-based inter-cluster weights with DTW-distance-based weights yields a 0.1\% improvement (3.700 $\to$ 3.696). While small, this change is conceptually consistent with the DTW clustering strategy: clusters with similar temporal patterns should share more model knowledge, regardless of physical distance.
+    \item \textbf{Learning Rate Decay and $\alpha$ Tuning (F $\to$ G):} The final configuration uses 60 communication rounds with step-wise learning rate decay and a mixing coefficient of $\alpha = 0.9$ (stronger cluster specialization). This produces a 0.5\% improvement (3.696 $\to$ 3.676), reaching the best overall MAE of \textbf{3.676}. The step-wise decay allows finer parameter adjustments in later rounds, while the higher $\alpha$ retains more cluster-specific knowledge during hierarchical synchronization.
+\end{itemize}
+\section{Prediction Horizon Analysis}
+\label{sec:horizon_analysis}
+Table~\ref{tab:horizon_results} reports MAE disaggregated by prediction horizon (15, 30, and 60 minutes) for all ablation configurations.
+\begin{table}[H]
+\centering
+\caption{Per-horizon MAE (mph) across ablation configurations on METR-LA.}
+\label{tab:horizon_results}
+\small
+\begin{tabular}{c l c c c c}
+\hline
+\textbf{Run} & \textbf{Configuration} & \textbf{15 min} & \textbf{30 min} & \textbf{60 min} & \textbf{Overall} \\
+\hline
+A & Global FedAvg & 3.088 & 3.840 & 4.896 & 3.832 \\
+B & + DTW Clustering & 3.015 & 3.755 & 4.805 & 3.753 \\
+C & + QW + Hier Agg (geo) & 2.986 & 3.723 & 4.754 & 3.722 \\
+D & + Adaptive Selection & 3.002 & 3.735 & 4.780 & 3.736 \\
+E & + Time-of-Day Features & 3.074 & 3.739 & 4.565 & 3.700 \\
+F & + DTW Hier Weighting & 3.083 & 3.734 & 4.543 & 3.696 \\
+G & + LR Decay + $\alpha{=}0.9$ & \textbf{3.051} & \textbf{3.705} & \textbf{4.559} & \textbf{3.676} \\
+\hline
+\end{tabular}
+\end{table}
+Two observations stand out from the horizon analysis:
+\begin{itemize}
+    \item \textbf{Time-of-day features disproportionately improve long-horizon predictions.} Comparing Run~D (speed-only) with Run~E (speed + ToD), the 60-minute MAE improves by 4.5\% (4.780 $\to$ 4.565) while the 15-minute MAE slightly increases (3.002 $\to$ 3.074). This is expected: short-term predictions depend primarily on recent speed values, while longer-horizon forecasts benefit from contextual information about the time of day (e.g., morning peak vs.\ late-night).
+    \item \textbf{Prediction quality degrades with horizon length.} Across all configurations, the 60-minute MAE is approximately 40--50\% higher than the 15-minute MAE. For the final configuration~G, the ratio is $4.559 / 3.051 = 1.49$, indicating that one-hour predictions are 49\% less accurate than 15-minute predictions. This degradation pattern is consistent with all published traffic forecasting methods on METR-LA \cite{li2018, wu2019graphwavenet}.
+\end{itemize}
+\section{Per-Cluster Performance Analysis}
+\label{sec:cluster_analysis}
+Table~\ref{tab:cluster_results} shows the per-cluster MAE breakdown for the final configuration (Run~G, 60 rounds). The eight clusters exhibit substantial performance variation, reflecting the heterogeneous nature of the METR-LA sensor network.
+\begin{table}[H]
+\centering
+\caption{Per-cluster performance breakdown (Run~G, 60 rounds). Clusters are ordered by DTW-based grouping.}
+\label{tab:cluster_results}
+\begin{tabular}{c r r r}
+\hline
+\textbf{Cluster} & \textbf{Sensors} & \textbf{MAE (mph)} & \textbf{60 min MAE} \\
+\hline
+0 & 31 & 3.779 & 4.503 \\
+1 & 32 & 3.835 & 4.850 \\
+2 & 8 & 2.414 & 2.550 \\
+3 & 36 & 4.281 & 5.494 \\
+4 & 8 & 2.588 & 3.162 \\
+5 & 25 & 4.161 & 5.251 \\
+6 & 39 & \textbf{2.000} & \textbf{2.246} \\
+7 & 28 & 5.177 & 6.663 \\
+\hline
+\textit{Overall} & \textit{207} & \textit{3.676} & \textit{4.559} \\
+\hline
+\end{tabular}
+\end{table}
+The cluster-level results reveal a wide MAE range from 2.000 (Cluster~6) to 5.177 (Cluster~7), a ratio of approximately $2.6\times$. Several factors contribute to this variation:
+\begin{itemize}
+    \item \textbf{Cluster~6 (39 sensors, MAE = 2.000)} appears to contain sensors with highly regular and low-variability speed profiles, making them easier to forecast. The consistently low MAE across both short and long horizons suggests that sensors in this cluster share stable, predictable temporal patterns.
+    \item \textbf{Cluster~7 (28 sensors, MAE = 5.177)} appears to capture more irregular or heterogeneous temporal patterns, which leads to higher forecast error. The large gap between overall and 60-minute MAE (5.177 vs.\ 6.663) suggests that this cluster contains sensors where traffic conditions are difficult to predict at longer horizons.
+    \item \textbf{Clusters~2 and 4 (8 sensors each, MAE $\approx$ 2.4--2.6)} are small, highly homogeneous clusters where DTW clustering groups sensors with very similar temporal profiles. The low intra-cluster non-IID divergence allows the cluster model to specialize effectively.
+    \item \textbf{Clusters~3 and 5 (36 and 25 sensors, MAE $\approx$ 4.2--4.3)} are larger clusters with moderate internal heterogeneity. Their higher MAE reflects the challenge of fitting a single model to a broader range of traffic patterns within the cluster.
+\end{itemize}
+These results suggest that DTW-based clustering produces groups with distinct levels of predictive difficulty, reflecting differences in temporal regularity and traffic variability across the sensor network.
+\section{Comparison with Published Baselines}
+\label{sec:lit_comparison}
+Table~\ref{tab:lit_comparison} compares the final framework configuration (Run~G) against published centralized and federated baselines on METR-LA.
+\begin{table}[H]
+\centering
+\caption{Comparison with published baselines on METR-LA. Centralized baselines use graph structure and full data access. Results marked with $\dagger$ are reproduced from the original papers. Communication cost is reported where available.}
+\label{tab:lit_comparison}
+\small
+\begin{tabular}{l l c c c c}
+\hline
+\textbf{Method} & \textbf{Type} & \textbf{MAE} & \textbf{RMSE} & \textbf{MAPE (\%)} & \textbf{Comm (GB)} \\
+\hline
+\multicolumn{6}{l}{\textit{Centralized baselines (full data access + graph structure)$\dagger$}} \\
+\hline
+DCRNN \cite{li2018} & Cent.+Graph & 3.17 & 6.45 & 8.80 & --- \\
+Graph WaveNet \cite{wu2019graphwavenet} & Cent.+Graph & 3.07 & 6.22 & 8.40 & --- \\
+ASTGCN \cite{guo2019} & Cent.+Graph & 3.38 & 7.10 & --- & --- \\
+\hline
+\multicolumn{6}{l}{\textit{Federated baselines$\dagger$}} \\
+\hline
+FedGRU & Federated & 5.64 & 13.57 & --- & 27.3 \\
+CMBA-FL \cite{zhu2025cmba} & Federated & 4.25 & 10.96 & --- & 36.4 \\
+\hline
+\multicolumn{6}{l}{\textit{Proposed framework}} \\
+\hline
+\textbf{Ours (Run G)} & \textbf{HFL} & \textbf{3.676} & \textbf{6.759} & \textbf{10.46} & \textbf{25.8} \\
+\hline
+\end{tabular}
+\end{table}
+The proposed framework achieves the following results relative to published baselines:
+\begin{itemize}
+    \item \textbf{vs.\ CMBA-FL:} The proposed framework reduces MAE by 13.5\% (4.25 $\to$ 3.676) while using 29.1\% less communication (36.4 $\to$ 25.8~GB). This is a substantial improvement over the most directly comparable federated baseline, which also uses a GRU-based architecture without graph structure.
+    \item \textbf{vs.\ FedGRU:} The proposed framework achieves a 34.8\% lower MAE (5.64 $\to$ 3.676) with 5.5\% less communication (27.3 $\to$ 25.8~GB). The large accuracy gap demonstrates that naive federated averaging without clustering, quality weighting, or hierarchical aggregation is insufficient for non-IID traffic data.
+    \item \textbf{vs.\ Centralized graph-based models:} The proposed framework achieves an MAE of 3.676, which is within 16.0\% of DCRNN (3.17) and 19.7\% of Graph WaveNet (3.07). Importantly, centralized models assume access to the full sensor network data and graph adjacency structure, while the proposed framework avoids centralizing raw sensor data and operates without any graph structure information. The RMSE of 6.759 is comparable to DCRNN (6.45) and better than ASTGCN (7.10), indicating competitive prediction distribution despite the federated constraint.
+\end{itemize}
+It should be noted that centralized graph-based baselines are not directly comparable to the proposed federated setting. They use full centralized data access and explicit spatial graph convolutions, which are unavailable under federated data isolation constraints. These results are therefore presented as contextual upper-bound references rather than direct comparisons.
+\section{Communication Cost Analysis}
+\label{sec:comm_analysis}
+Communication efficiency is a central objective of this thesis. Reported communication costs are converted from logged megabytes using a 1024~MB per GB convention. Table~\ref{tab:comm_analysis} reports the communication cost for each ablation configuration.
+\begin{table}[H]
+\centering
+\caption{Communication cost across ablation configurations.}
+\label{tab:comm_analysis}
+\begin{tabular}{c l r r r}
+\hline
+\textbf{Run} & \textbf{Configuration} & \textbf{Comm (GB)} & \textbf{Participation} & \textbf{Rounds} \\
+\hline
+A & Global FedAvg & 24.3 & 100\% & 50 \\
+B & + DTW Clustering & 24.3 & 100\% & 50 \\
+C & + QW + Hier Agg & 24.5 & 100\% & 50 \\
+D & + Adaptive Selection & 21.5 & 75\% & 50 \\
+E & + Time-of-Day Features & 21.5 & 75\% & 50 \\
+F & + DTW Hier Weighting & 21.5 & 75\% & 50 \\
+G & + LR Decay + $\alpha{=}0.9$ & 25.8 & 75\% & 60 \\
+\hline
+\end{tabular}
+\end{table}
+The communication cost analysis reveals two key dynamics:
+\begin{itemize}
+    \item \textbf{Adaptive client selection reduces per-round communication.} The transition from full participation (Run~C) to adaptive selection (Run~D) reduces total communication by 12.2\% (24.5 $\to$ 21.5~GB) at the same number of rounds. This reduction comes from fewer client uploads per round (approximately 155 instead of 207), while cluster-model broadcasts to all members remain unchanged.
+    \item \textbf{More rounds increase total cost but improve accuracy.} The final configuration (Run~G) uses 60 rounds instead of 50, increasing total communication from 21.5 to 25.8~GB. This 20\% increase in communication is justified by a 0.5\% MAE improvement (3.696 $\to$ 3.676), achieved through the additional rounds combined with learning rate decay.
+\end{itemize}
+For the final configuration, the total communication cost of 25.8~GB is dominated by client uploads and cluster-model downloads. Upload cost scales with the number of selected clients per round and is therefore directly reduced by adaptive client selection. Download cost remains substantial because the aggregated cluster models are broadcast to all cluster members at each round. Hierarchical synchronization contributes only a small overhead because only $K=8$ cluster models are exchanged every five rounds. Thus, the communication savings primarily come from reducing client uploads while preserving the broadcast structure required for cluster synchronization.
+Compared to CMBA-FL, which requires 36.4~GB over approximately 109 rounds \cite{zhu2025cmba}, the proposed framework achieves 29.1\% lower communication cost while delivering 13.5\% better MAE. This indicates that the combination of adaptive client selection, hierarchical aggregation, and fewer required rounds produces a more communication-efficient framework.
+
+\section{Cross-Dataset Validation: PEMS-BAY}
+\label{sec:pemsbay_results}
+
+To assess generalization beyond METR-LA, the final framework configuration was evaluated on the PEMS-BAY dataset (325 sensors, 50 communication rounds). Table~\ref{tab:pemsbay_results} summarizes the results.
+
+\begin{table}[H]
+\centering
+\caption{Cross-dataset validation results on PEMS-BAY.}
+\label{tab:pemsbay_results}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{lccccccc}
+\hline
+\textbf{Dataset} & \textbf{MAE} & \textbf{RMSE} & \textbf{MAPE} & \textbf{15 min} & \textbf{30 min} & \textbf{60 min} & \textbf{Comm.} \\
+                 &              &               & \textbf{(\%)} &                 &                 &                 & \textbf{(GB)} \\
+\hline
+PEMS-BAY & 2.052 & 4.366 & 4.93 & 1.570 & 2.088 & 2.723 & 33.6 \\
+\hline
+\end{tabular}
+\end{table}
+
+The framework achieves an overall MAE of 2.052 on PEMS-BAY, which is lower than the METR-LA result of 3.676. This difference is consistent with the commonly observed lower prediction difficulty of PEMS-BAY compared with METR-LA~\cite{li2018}, as PEMS-BAY generally exhibits more regular freeway traffic patterns.
+
+The PEMS-BAY result is noteworthy for several reasons:
+
+\begin{itemize}
+    \item The same core framework configuration, including DTW clustering with $K=8$, quality-weighted hierarchical aggregation, adaptive client selection, and time-of-day features, was applied without dataset-specific architectural tuning. This provides initial evidence that the proposed approach generalizes across different sensor networks.
+
+    \item The MAPE of 4.93\% on PEMS-BAY is substantially lower than the 10.46\% achieved on METR-LA, indicating that the framework performs well on data with lower inherent prediction difficulty.
+
+    \item The total communication cost of 33.6~GB is higher than the METR-LA cost of 25.8~GB due to the larger number of sensors, 325 compared with 207, which increases per-round upload and download volumes.
+\end{itemize}
+
+\section{Discussion}
+\label{sec:discussion}
+\subsection{Key Findings}
+The experimental results support the following conclusions:
+\begin{itemize}
+    \item \textbf{DTW-based clustering is the largest individual contributor to accuracy in the ablation study.} The transition from a single global model (Run~A) to DTW-clustered models (Run~B) provides the largest individual MAE improvement in the ablation (2.1\%). This supports the observation that traffic sensors exhibit non-IID temporal patterns, and grouping by temporal similarity reduces intra-cluster divergence.
+    \item \textbf{Quality-weighted hierarchical aggregation provides consistent improvement.} Adding quality-aware aggregation and inter-cluster knowledge sharing (Run~C) further reduces MAE by 0.8\%. The combination of these two mechanisms is effective because quality weighting filters out noisy client updates, while hierarchical synchronization enables cross-cluster learning without destroying cluster specialization.
+    \item \textbf{Adaptive client selection is a communication-accuracy trade-off.} Run~D shows a 0.4\% MAE increase relative to Run~C, but reduces communication by 12.2\%. This trade-off is central to the thesis objective: in bandwidth-constrained edge networks, reducing communication overhead while maintaining competitive accuracy is more important than maximizing accuracy at any cost.
+    \item \textbf{Time-of-day features improve long-horizon predictions.} The addition of sinusoidal temporal encodings (Run~E) primarily benefits the 60-minute forecast horizon (4.5\% improvement), indicating that diurnal traffic periodicity is a valuable signal for longer-term predictions.
+    \item \textbf{The framework generalizes across datasets.} The PEMS-BAY results (MAE = 2.052) demonstrate that the same core framework configuration works on a different sensor network without dataset-specific architectural modifications, supporting the generalizability of the proposed approach.
+\end{itemize}
+\subsection{Communication--Accuracy Trade-off}
+The results reveal two practical operating points for the proposed framework. Run~F provides the most communication-efficient configuration, achieving MAE = 3.696 with 21.5~GB total communication over 50 rounds. Run~G provides the highest-accuracy configuration, reducing MAE to 3.676 at the cost of increased communication (25.8~GB) due to 10 additional training rounds. This illustrates that the proposed framework can be tuned depending on whether the deployment prioritizes lower communication cost or maximum forecasting accuracy.
+Both operating points outperform CMBA-FL (MAE = 4.25, 36.4~GB) in both accuracy and communication. Even the communication-efficient Run~F achieves 13.0\% better MAE than CMBA-FL while using 40.9\% less communication. This suggests that the proposed hierarchical approach offers a favorable accuracy--communication frontier compared to existing federated traffic forecasting methods.
+\subsection{Convergence Behavior}
+The training convergence before final learning-rate tuning was analyzed by examining intermediate evaluation metrics recorded every five rounds. Table~\ref{tab:convergence} shows the trajectory for Run~F, the 50-round DTW-weighted hierarchical configuration. This run is useful for assessing whether additional rounds alone improve performance before introducing the learning-rate schedule used in Run~G.
+\begin{table}[H]
+\centering
+\caption{Convergence trajectory for Run~F (50 rounds).}
+\label{tab:convergence}
+\begin{tabular}{r c c c}
+\hline
+\textbf{Round} & \textbf{MAE} & \textbf{60 min MAE} & \textbf{Avg Loss} \\
+\hline
+5 & 3.921 & 4.915 & 0.502 \\
+10 & 3.847 & 4.833 & 0.508 \\
+15 & 3.834 & 4.798 & 0.481 \\
+20 & 3.811 & 4.744 & 0.487 \\
+25 & 3.797 & 4.695 & 0.474 \\
+30 & 3.748 & 4.625 & 0.460 \\
+35 & 3.747 & 4.623 & 0.448 \\
+40 & 3.716 & 4.582 & 0.439 \\
+45 & 3.708 & 4.555 & 0.428 \\
+50 & 3.696 & 4.543 & 0.440 \\
+\hline
+\end{tabular}
+\end{table}
+The convergence trajectory shows steady improvement throughout training, with MAE decreasing from 3.921 at round~5 to 3.696 at round~50. The rate of improvement slows in later rounds (0.012 MAE improvement from round~45 to~50 vs.\ 0.074 from round~5 to~10), indicating that the model approaches convergence by round~50. An extended 75-round experiment with the same configuration achieved MAE = 3.697 at round~75, confirming that additional rounds beyond 50 provide minimal benefit without learning rate scheduling. This supports the decision to use learning rate decay (Run~G) rather than simply increasing the number of rounds.
+\subsection{Limitations}
+Several limitations of the current work should be acknowledged:
+\begin{itemize}
+    \item \textbf{No graph structure.} The proposed framework does not use any spatial adjacency or graph structure information. While this is a deliberate design choice that enables strict federated data isolation, it limits the framework's ability to model spatial dependencies between nearby sensors. Centralized graph-based models such as DCRNN and Graph WaveNet achieve 14--20\% lower MAE partly because they explicitly model these spatial relationships.
+    \item \textbf{Fixed cluster assignments.} The DTW-based clustering is performed once before training and remains fixed throughout the federated process. Dynamic re-clustering during training could potentially adapt to evolving traffic patterns, but this would increase computational overhead and require additional communication for cluster reassignment.
+    \item \textbf{Cluster size imbalance.} The eight clusters range from 8 to 39 sensors, creating an imbalance in the number of training samples per cluster. Smaller clusters may have limited data diversity, while larger clusters may contain more heterogeneous traffic patterns. Both cases can affect the stability and specialization of cluster-level models.
+    \item \textbf{Simulated client availability.} Client availability and latency are simulated using predefined reliability profiles rather than measured from a real ITS edge deployment. While this enables controlled evaluation of adaptive selection, real-world deployments may exhibit more complex network behavior, including correlated outages, variable bandwidth, and hardware-specific computation delays.
+    \item \textbf{Limited cross-dataset training budget.} PEMS-BAY experiments were run for 50 communication rounds due to computational constraints, while the final METR-LA configuration used 60 rounds. Therefore, PEMS-BAY results primarily serve as cross-dataset validation rather than a fully optimized benchmark comparison.
+    \item \textbf{Single model architecture.} All experiments use the same GRU Seq2Seq architecture. While this ensures fair comparison across ablation configurations, cluster-specific architectures could potentially improve per-cluster accuracy by adapting model capacity to cluster complexity.
+\end{itemize}

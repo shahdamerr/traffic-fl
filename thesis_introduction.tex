@@ -1,12 +1,14 @@
 \chapter{Introduction}
-\label{ch:introduction}
+\label{chap:intro}
 
-\section{Motivation}
-Intelligent Transportation Systems (ITS) heavily rely on accurate short-term and long-term traffic flow prediction to optimize routing, alleviate congestion, and reduce carbon emissions. Historically, traffic prediction models have relied on centralized architectures, where raw data collected from thousands of ubiquitous sensors is continuously transmitted to a central cloud server for training. While centralized models—ranging from traditional statistical methods like ARIMA to advanced Spatio-Temporal Graph Neural Networks (STGCN) and Sequence-to-Sequence (Seq2Seq) models—can achieve high accuracy, this paradigm poses two critical challenges: significant communication overhead and severe data privacy risks.
+The rapid pace of urbanisation has led to a significant increase in the size and population density of cities. The rapid growth of this market has created a huge demand for various forms of transportation like including autonomous driving, carpooling, and public transportation. As a result, issues such as traffic congestion and environmental pollution from vehicle emissions have intensified. In response, \ac{ITS} have gained considerable attention \cite{lin2017intelligent, luo2021spatial}. Within ITS ,\ac{TFP} plays a crucial role. In this thesis, TFP refers specifically to short-term traffic speed forecasting from loop-detector sensor observations. It is widely applied in areas such as route planning, trip navigation, and traffic management, enhancing transportation efficiency by providing accurate and timely traffic flow information \cite{dai2020hybrid}.
 
-Federated Learning (FL) has emerged as a promising paradigm to address these challenges by allowing edge devices (e.g., roadside units or vehicular networks) to collaboratively train a shared model without exchanging their raw local data. Instead of data, only model parameters or gradients are communicated to the aggregation server. However, applying standard federated aggregation algorithms, such as FedAvg \cite{mcmahan2017}, to traffic forecasting introduces new obstacles. Traffic data is highly non-Independent and Identically Distributed (non-IID); sensors on a highway experience drastically different temporal patterns compared to those on residential arterials. When a single global model attempts to fit all these divergent patterns simultaneously, it often suffers from slow convergence and suboptimal accuracy. Furthermore, in realistic vehicular networks, client availability is dynamic, and the communication bandwidth required to frequently upload large deep learning models like Sequence-to-Sequence (Seq2Seq) GRUs remains prohibitively high \cite{zhu2025cmba}. 
+\section{Motivation} \label{sec:s1}
+Accurate short-term and long-term traffic flow prediction plays a critical role in Intelligent Transportation Systems (ITS) for optimising routing, alleviating congestion, and reducing carbon emissions. Previously, traffic prediction models have relied on centralized architectures, where raw data collected from thousands of edge sensing devices is continuously transmitted to a central cloud server for training. While centralized models, ranging from traditional statistical methods like ARIMA to advanced Spatio-Temporal Graph Neural Networks (STGCN) and Sequence-to-Sequence (Seq2Seq) models, can achieve high accuracy, this paradigm poses three critical challenges: significant communication overhead, potential data privacy and governance concerns, and failure to fully utilize the computational capabilities available at edge devices.
 
-To bridge this gap, there is a pressing need for a structured federated learning framework that can handle the extreme spatial-temporal heterogeneity of traffic data while aggressively mitigating communication costs and adapting to unreliable edge network conditions.
+Federated Learning (FL) has emerged as a promising paradigm to address these challenges by allowing edge devices (e.g., roadside units or vehicular networks) to collaboratively train a shared model without directly exchanging their raw local data. Instead of data, only model parameters or gradients are communicated to the aggregation server. However, applying standard federated aggregation algorithms, such as \ac{FedAvg} \cite{mcmahan2017}, to traffic forecasting introduces new obstacles. Traffic data are highly \ac{non-IID}: highway sensors may exhibit substantially different temporal patterns from residential or arterial road sensors. When a single global model attempts to fit all these divergent patterns simultaneously, it often suffers from slow convergence and suboptimal accuracy. Furthermore, in realistic vehicular networks, client availability is dynamic, and the communication bandwidth required to frequently upload deep learning model updates can remain substantial in bandwidth-constrained settings \cite{zhu2025cmba}.
+
+A hierarchical structure can address these limitations by allowing sensors with similar traffic behavior to train specialized cluster models while still enabling controlled knowledge sharing between clusters. To bridge this gap, there is a pressing need for a structured federated learning framework that can handle the extreme spatio-temporal heterogeneity of traffic data while explicitly reducing and accounting for communication costs and adapting to unreliable edge network conditions.
 
 \section{Aim and Research Questions}
 The primary aim of this thesis is to design, implement, and evaluate a novel \textbf{Hierarchical Federated Learning Framework} specifically optimized for communication-efficient traffic flow prediction in Intelligent Transportation Systems.
@@ -14,38 +16,54 @@ The primary aim of this thesis is to design, implement, and evaluate a novel \te
 This work is guided by the following central research question:
 
 \begin{quote}
-\textit{Can clustering traffic sensors by temporal pattern similarity improve the accuracy and communication efficiency of federated learning for traffic flow prediction?}
+\textit{Can a temporal-pattern-aware hierarchical federated learning framework improve traffic prediction accuracy while reducing communication cost under non-IID traffic sensor distributions?}
 \end{quote}
 
-\noindent To systematically address this question, the thesis investigates four sub-questions:
+\noindent To systematically address this question, the thesis investigates these sub-questions:
 
-\begin{enumerate}[label=\textbf{SQ\arabic*:}]
-    \item How does DTW-based clustering compare to global federated averaging for heterogeneous traffic data?
-    \item Does hierarchical knowledge sharing between clusters improve prediction accuracy over isolated cluster training?
-    \item Can adaptive client selection reduce communication costs without significantly degrading model performance?
-    \item Is traffic pattern similarity (DTW) a more effective basis for inter-cluster aggregation than geographic proximity?
+\begin{enumerate}
+    \item Does DTW-based clustering improve prediction accuracy over global FedAvg under non-IID traffic sensor distributions?
+    \item Does hierarchical knowledge sharing between clusters improve accuracy over isolated cluster training?
+    \item Can adaptive client selection reduce communication cost without significantly degrading prediction performance?
+    \item Is traffic pattern similarity, measured using \ac{DTW}, a more effective basis for inter-cluster aggregation than geographic proximity?
 \end{enumerate}
 
 \section{Objectives}
 To answer the above research questions, the thesis defines the following specific objectives:
 \begin{enumerate}
-    \item \textbf{Traffic-Pattern Aware Clustering:} To implement Dynamic Time Warping (DTW) to cluster traffic sensors based on temporal behavioral similarity rather than mere geographic proximity, ensuring that models specialize in homogeneous traffic patterns \cite{feng2024}.
-    \item \textbf{Hierarchical Aggregation Strategy:} To develop a two-level aggregation scheme where intra-cluster models are trained locally (Level 1), and inter-cluster knowledge is shared periodically through a distance-weighted global average (Level 2), thereby balancing model specialization with spatial generalization.
-    \item \textbf{Communication Efficiency and Robustness:} To reduce communication overhead through an adaptive, reliability-based client selection mechanism that dynamically selects participating nodes each round, coupled with quality-weighted aggregation that prioritizes higher-performing clients during model merging \cite{dai2024}.
-    \item \textbf{Comprehensive Ablation and Benchmarking:} To rigorously validate the proposed framework on the real-world METR-LA dataset using a Sequence-to-Sequence GRU architecture \cite{zhu2025cmba}, directly comparing the hierarchical clustered approach against global FedAvg and centralized baselines.
+    \item \textbf{Traffic-Pattern-Aware Clustering:} To implement Dynamic Time Warping (DTW) for grouping traffic sensors based on temporal behavioral similarity rather than geographic proximity, ensuring that models specialize in homogeneous traffic patterns \cite{feng2024}.
+    
+    \item \textbf{Hierarchical Federated Aggregation:} To develop a two-level aggregation strategy that balances intra-cluster specialization with controlled inter-cluster knowledge sharing through DTW-distance-weighted hierarchical synchronization.
+    
+    \item \textbf{Quality-Aware Aggregation:} To incorporate quality-weighted aggregation within each cluster so that clients with more reliable local training behavior contribute more effectively to model updates \cite{dai2024}.
+    
+    \item \textbf{Communication Efficiency and Robustness:} To reduce communication overhead through adaptive reliability-based client selection under dynamic client availability.
+    
+    \item \textbf{Comprehensive Evaluation:} To validate the framework on the METR-LA dataset using a GRU \ac{Seq2Seq} forecasting model \cite{zhu2025cmba} and compare it against global FedAvg, clustered baselines, and centralized references.
+\end{enumerate}
+
+\section{Contributions}
+
+The main contributions of this thesis are summarized as follows:
+
+\begin{enumerate}
+    \item A DTW-based clustering strategy that groups traffic sensors according to temporal pattern similarity to reduce non-IID divergence in federated traffic prediction.
+    \item A lightweight hierarchical federated learning framework that combines intra-cluster specialization with DTW-weighted inter-cluster knowledge sharing.
+    \item An adaptive reliability-aware client selection mechanism with explicit communication-cost accounting under dynamic client availability.
+    \item A comprehensive ablation study on the METR-LA dataset evaluating clustering, hierarchical aggregation, adaptive selection, time-of-day features, and DTW-based inter-cluster weighting.
 \end{enumerate}
 
 \section{Thesis Outline}
 The remainder of this thesis is organized as follows:
 
 \begin{itemize}
-    \item \textbf{Chapter 2: Background and Literature Review.} This chapter provides the theoretical foundations of sequence modeling in traffic prediction, introduces the principles of Federated Learning, and critically reviews recent advancements in Spatio-Temporal FL, client selection, and communication sparsification techniques within Intelligent Transportation Systems.
+    \item \textbf{Chapter 2: Background and Literature Review.} This chapter reviews the foundations of traffic flow prediction, sequence modeling, Federated Learning, non-IID data challenges, clustering-based FL, hierarchical aggregation, and communication-efficient FL in Intelligent Transportation Systems.
     
-    \item \textbf{Chapter 3: Methodology.} This chapter details the proposed Hierarchical Federated Learning framework. It provides an in-depth mathematical and architectural description of the DTW-based clustering algorithm, the Seq2Seq GRU local models, the adaptive client selection policy, the quality-weighted aggregation, and the two-tier distance-weighted hierarchical aggregation strategy.
+    \item \textbf{Chapter 3: Methodology.} This chapter presents the proposed Hierarchical Federated Learning framework, including DTW-based sensor clustering, the GRU Seq2Seq forecasting model, quality-weighted aggregation, adaptive client selection, and two-tier hierarchical aggregation.
     
-    \item \textbf{Chapter 4: Ablation Study.} This chapter isolates the individual components of the proposed pipeline. It systematically evaluates the impact of clustering versus a flat global network, the contribution of hierarchical inter-cluster aggregation, the effect of adaptive client selection on communication costs, and the comparison between DTW-weighted and geography-weighted hierarchical sharing.
+    \item \textbf{Chapter 4: Implementation and Experimental Setup.} This chapter describes the hardware and software environment, codebase architecture, preprocessing pipeline, training configurations, ablation design, baseline methods, evaluation metrics, and reproducibility measures.
     
-    \item \textbf{Chapter 5: Results and Discussion.} This chapter presents the final comparative performance of the complete framework against baseline models on the METR-LA dataset. It analyzes the results across multiple prediction horizons (15, 30, and 60 minutes), discusses the per-cluster performance variations, and evaluates the overall communication cost reductions achieved.
+    \item \textbf{Chapter 5: Results and Discussion.} This chapter presents the experimental results on METR-LA and PEMS-BAY, analyzes ablation results, prediction horizons, per-cluster behavior, baseline comparisons, and communication-cost trade-offs.
     
-    \item \textbf{Chapter 6: Conclusion.} The final chapter summarizes the key findings and contributions of the research, acknowledges the limitations of the current implementation, and outlines promising directions for future work, including the integration of external topological metadata.
+    \item \textbf{Chapter 6: Conclusion and Future Work.} This chapter summarizes the main findings, answers the research questions, discusses the contributions and limitations, and outlines future directions such as privacy-preserving spatial modeling, dynamic clustering, cluster-adaptive architectures, and extended cross-dataset evaluation.
 \end{itemize}

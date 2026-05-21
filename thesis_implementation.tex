@@ -1,0 +1,269 @@
+\chapter{Implementation and Experimental Setup}
+\label{ch:implementation}
+
+This chapter describes the practical implementation of the proposed Hierarchical Federated Learning framework, the experimental configurations used to evaluate it, and the evaluation protocol. While Chapter~\ref{ch:methodology} presented the algorithmic design and mathematical formulation, this chapter focuses on the specific software environment, hyperparameter settings, ablation study design, baseline comparisons, and evaluation metrics used to produce the results reported in Chapter~\ref{ch:results}.
+
+\section{Implementation Environment}
+\label{sec:environment}
+
+\subsection{Hardware Configuration}
+
+The framework was developed and debugged locally on a laptop equipped with an NVIDIA GeForce RTX 3050 Ti GPU (4~GB VRAM). Full-scale federated experiments involving all 207 METR-LA sensors over 60 communication rounds were executed on Google Colab using an NVIDIA T4 GPU (16~GB VRAM), which provided sufficient memory for full-scale federated training across all clusters. A full 60-round METR-LA experiment required approximately 3.5 hours of GPU time.
+
+\subsection{Software Stack}
+
+The framework was implemented in Python. Local development used Python~3.13, while full-scale experiments were executed in the Google Colab runtime. Table~\ref{tab:software} summarizes the key libraries and their roles.
+
+\begin{table}[H]
+\centering
+\caption{Software dependencies.}
+\label{tab:software}
+\begin{tabular}{lll}
+\hline
+\textbf{Library} & \textbf{Version} & \textbf{Role} \\
+\hline
+PyTorch & 2.x with CUDA support & Model training and GPU acceleration \\
+NumPy & 2.x & Data manipulation, DTW computation \\
+Pandas & 2.x & Dataset loading and sensor metadata \\
+SciPy & 1.x & Distance matrices, MDS embedding \\
+scikit-learn & 1.x & K-Means clustering, silhouette analysis \\
+Matplotlib & 3.x & Figure generation \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Codebase Architecture}
+\label{sec:codebase}
+
+The implementation is organized as a modular Python codebase. Table~\ref{tab:codebase} describes the main components.
+
+\begin{table}[H]
+\centering
+\caption{Codebase organization.}
+\label{tab:codebase}
+\begin{tabular}{p{0.38\textwidth}p{0.55\textwidth}}
+\hline
+\textbf{Module / File} & \textbf{Purpose} \\
+\hline
+\texttt{scripts/prepare\_data.py} & Preprocesses raw METR-LA data: zero masking, imputation, normalization, sliding window construction, and time-of-day feature generation \\
+\texttt{scripts/run\_dtw\_clustering.py} & Computes pairwise DTW distances, applies MDS embedding, and performs K-Means clustering \\
+\texttt{scripts/run\_fl\_experiment.py} & Main experiment runner: coordinates federated training, evaluation, and result logging \\
+\texttt{models/gru\_seq2seq.py} & Implements the GRU Encoder-Decoder forecasting model \\
+\texttt{fl/client.py} & Defines local client training behavior \\
+\texttt{fl/fl\_trainer.py} & Coordinates federated rounds, hierarchical synchronization, and global evaluation \\
+\texttt{fl/aggregation.py} & Implements FedAvg and quality-weighted aggregation \\
+\texttt{fl/client\_selector.py} & Implements full, random-dropout, and adaptive reliability-based client selection \\
+\texttt{config.py} & Stores global hyperparameters and feature toggles \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Data Preparation Pipeline}
+\label{sec:data_pipeline}
+
+The raw METR-LA data were processed using the preprocessing script in the following sequence:
+
+\begin{enumerate}
+    \item Load raw speed readings for all 207 sensors (34,272 time steps each).
+    \item Replace all $0.0$ mph readings with missing values (approximately 8.11\% of readings).
+    \item Impute missing values using the per-sensor temporal mean of valid (non-zero) readings.
+    \item Apply per-sensor z-score normalization using training-set statistics only.
+    \item Construct sliding windows with $L=12$ input steps and $H=12$ output steps.
+    \item Split the data chronologically into 70\% training, 10\% validation, and 20\% test sets (no shuffling to prevent temporal leakage).
+    \item Generate time-of-day indices and compute sinusoidal (sin/cos) cyclical features for each time step.
+\end{enumerate}
+
+The same preprocessing logic was applied to the PEMS-BAY dataset (325 sensors) for cross-dataset validation, with dataset-specific parameters such as the number of sensors and cluster assignments adjusted.
+
+\section{Model and Training Configuration}
+\label{sec:config}
+
+\subsection{Local Model Hyperparameters}
+
+Each client trains a GRU Encoder-Decoder (Seq2Seq) model as described in Section~\ref{sec:model}. The model contains 316,161 trainable parameters, corresponding to a transfer size of 1.26~MB per model update (stored as 32-bit floating point values). Table~\ref{tab:model_config} summarizes the local model hyperparameters.
+
+\begin{table}[H]
+\centering
+\caption{Local model hyperparameters.}
+\label{tab:model_config}
+\begin{tabular}{ll}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Encoder input size & 3 (speed + sin/cos ToD) \\
+Hidden size ($d_h$) & 128 \\
+GRU layers ($N_\ell$) & 2 \\
+Dropout ($p$) & 0.2 \\
+Sequence length ($L$) & 12 (1 hour) \\
+Forecast horizon ($H$) & 12 (1 hour) \\
+Optimizer & Adam \cite{kingma2015adam} \\
+Initial learning rate & $5 \times 10^{-4}$ \\
+Weight decay & $10^{-5}$ \\
+Batch size (train / eval) & 512 / 256 \\
+Gradient clipping & $\|\nabla\|_{\max} = 5.0$ \\
+Loss function & Mean Squared Error (MSE) \\
+Teacher forcing & $p_{\text{tf}} = 0.0$ (disabled) \\
+\hline
+\end{tabular}
+\end{table}
+
+Although the implementation supports teacher forcing with configurable linear decay, the final experiments disable it entirely ($p_{\text{tf}}=0.0$), training the decoder fully autoregressively from the beginning to match the inference setting.
+
+\subsection{Federated Training Configuration}
+
+Table~\ref{tab:fl_config} lists the federated training configuration used in the final experiments.
+
+\begin{table}[H]
+\centering
+\caption{Federated training configuration.}
+\label{tab:fl_config}
+\begin{tabular}{ll}
+\hline
+\textbf{Parameter} & \textbf{Value} \\
+\hline
+Communication rounds ($R$) & 60 \\
+Local optimization steps ($E$) & 20 \\
+Client selection & Adaptive reliability-based \\
+Observed average participation rate & $\approx$75\% \\
+Quality temperature ($\tau$) & 0.5 \\
+Hierarchical sync period ($P$) & 5 rounds \\
+Mixing coefficient ($\alpha$) & 0.9 \\
+Hierarchical weighting & DTW-distance weighted \\
+Learning rate schedule & $5{\times}10^{-4} \xrightarrow{r=40} 2.5{\times}10^{-4} \xrightarrow{r=50} 10^{-4}$ \\
+\hline
+\end{tabular}
+\end{table}
+
+The step-wise learning rate decay was introduced to improve late-stage convergence: the initial rate is reduced by 50\% at round 40 and by a further 60\% at round 50, allowing finer parameter adjustments as the model approaches convergence.
+
+\subsection{Client Availability Simulation}
+
+To emulate realistic edge-network conditions, each sensor was assigned a fixed reliability profile representing availability probability and expected communication latency. These profiles were drawn before training and remained constant across all rounds. Table~\ref{tab:client_profiles} summarizes the three tiers.
+
+\begin{table}[H]
+\centering
+\caption{Simulated client reliability profiles.}
+\label{tab:client_profiles}
+\begin{tabular}{llll}
+\hline
+\textbf{Tier} & \textbf{Share} & \textbf{Availability $p_i$} & \textbf{Latency $\lambda_i$} \\
+\hline
+Stable & 60\% & $\mathcal{U}(0.85, 0.95)$ & $\mathcal{U}(50, 150)$ ms \\
+Moderate & 25\% & $\mathcal{U}(0.55, 0.70)$ & $\mathcal{U}(150, 350)$ ms \\
+Unreliable & 15\% & $\mathcal{U}(0.20, 0.40)$ & $\mathcal{U}(350, 500)$ ms \\
+\hline
+\end{tabular}
+\end{table}
+
+These profiles are used by the adaptive reliability-based client selection mechanism described in Section~\ref{sec:client_selection}.
+
+\section{Experimental Design}
+\label{sec:exp_design}
+
+\subsection{Ablation Study Design}
+
+The proposed framework was evaluated through a cumulative ablation study, where each experiment adds one component to the previous configuration. This design isolates the contribution of each mechanism. Table~\ref{tab:ablation_design} summarizes the experimental progression.
+
+\begin{table}[H]
+\centering
+\caption{Ablation study design. Each row adds one component to the previous configuration.}
+\label{tab:ablation_design}
+\small
+\begin{tabular}{c p{0.32\textwidth} p{0.48\textwidth}}
+\hline
+\textbf{Run} & \textbf{Configuration} & \textbf{Purpose} \\
+\hline
+A & Global FedAvg & Baseline: single global model, no clustering \\
+B & + DTW Clustering & Tests temporal-pattern-aware sensor grouping \\
+C & + Quality-Weighted and Hierarchical Aggregation & Tests quality-aware intra-cluster aggregation and inter-cluster knowledge sharing \\
+D & + Adaptive Client Selection & Tests communication-efficient participation under dynamic availability \\
+E & + Time-of-Day Features & Tests temporal feature augmentation \\
+F & + DTW Hierarchical Weighting & Tests DTW-similarity-based inter-cluster weighting vs.\ geographic distance \\
+G & + LR Decay + $\alpha=0.9$ & Final tuning: learning rate scheduling and stronger cluster specialization \\
+\hline
+\end{tabular}
+\end{table}
+
+All ablation runs use the same GRU Seq2Seq architecture, the same preprocessed data, and the same random seed to ensure fair comparison.
+
+\subsection{Baseline Methods}
+
+The proposed framework was compared against the following baselines:
+
+\begin{itemize}
+    \item \textbf{Global FedAvg (implemented):} A single federated model trained across all 207 sensors without clustering, using the same GRU Seq2Seq architecture and training configuration.
+    
+    \item \textbf{Clustered FL without hierarchy (implemented):} Sensors are grouped using DTW clustering, but clusters train independently without hierarchical synchronization ($\alpha = 1.0$).
+    
+    \item \textbf{Geographic hierarchical weighting (implemented):} Inter-cluster aggregation weights are computed using inverse Haversine distances between cluster centroids instead of DTW distances.
+    
+    \item \textbf{Centralized literature baselines (reported):} Published results from centralized models---DCRNN \cite{li2018}, Graph WaveNet \cite{wu2019graphwavenet}, and ASTGCN \cite{guo2019}---are included for contextual comparison. These models were not re-implemented; their reported METR-LA metrics are used directly.
+    
+    \item \textbf{Federated literature baselines (reported):} Published results from federated methods---FedGRU and CMBA-FL \cite{zhu2025cmba}---are used to compare accuracy and communication trade-offs.
+\end{itemize}
+
+It should be noted that centralized baselines are not directly equivalent to the proposed FL setting because they assume centralized access to all sensor observations and, in many cases, graph structure information. They are therefore used as contextual performance references rather than communication-constrained FL baselines.
+
+\subsection{Cross-Dataset Validation}
+
+To assess generalization beyond METR-LA, the final framework configuration was also evaluated on the PEMS-BAY dataset \cite{li2018}, which contains speed readings from 325 loop-detector sensors in the San Francisco Bay Area. The same preprocessing logic, DTW clustering strategy ($K=8$), model architecture, and core federated training settings were applied. Only dataset-specific parameters, including the number of sensors, cluster assignments, and number of communication rounds, were adjusted. For PEMS-BAY, the final configuration was evaluated for 50 communication rounds due to GPU memory constraints observed during longer runs.
+
+\section{Evaluation Protocol}
+\label{sec:eval_protocol}
+
+\subsection{Evaluation Metrics}
+
+Model performance is evaluated using three standard traffic forecasting metrics \cite{li2018}, computed on denormalized predictions in original speed units (mph):
+
+\textbf{Mean Absolute Error (MAE):}
+\begin{equation}
+\text{MAE} = \frac{1}{n} \sum_{i=1}^{n} |y_i - \hat{y}_i|
+\end{equation}
+
+\textbf{Root Mean Squared Error (RMSE):}
+\begin{equation}
+\text{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^{n} (y_i - \hat{y}_i)^2}
+\end{equation}
+
+\textbf{Mean Absolute Percentage Error (MAPE):}
+\begin{equation}
+\text{MAPE} = \frac{100\%}{|\mathcal{M}|} \sum_{i \in \mathcal{M}} \left|\frac{y_i - \hat{y}_i}{y_i}\right|
+\end{equation}
+where $\mathcal{M} = \{i : |y_i| > 5.0\}$ masks out near-zero speed values where percentage error is undefined, following the convention established by Li et al. \cite{li2018}.
+
+\subsection{Prediction Horizons and Reporting}
+
+All metrics are reported both as overall averages across all sensors and all time steps, and disaggregated by three prediction horizons:
+
+\begin{itemize}
+    \item \textbf{15 minutes} ($h = 3$): Short-term forecasting accuracy.
+    \item \textbf{30 minutes} ($h = 6$): Medium-term forecasting accuracy.
+    \item \textbf{60 minutes} ($h = 12$): Long-term forecasting accuracy.
+\end{itemize}
+
+This multi-horizon evaluation follows the standard reporting convention for METR-LA and PEMS-BAY benchmarks \cite{li2018, wu2019graphwavenet}.
+
+\subsection{Communication Cost Measurement}
+
+Communication cost is a central metric in this thesis, reflecting the ``Communication-Efficient'' objective in the thesis title. The total communication cost is measured by tracking all model transfers during federated training:
+
+\begin{itemize}
+    \item \textbf{Uploads:} Each selected client uploads its updated model to the cluster server after local training.
+    \item \textbf{Downloads:} The aggregated cluster model is broadcast to all cluster members at the start of each round.
+    \item \textbf{Hierarchical synchronization:} When inter-cluster aggregation fires (every $P$ rounds), all $K$ cluster models are exchanged.
+\end{itemize}
+
+Each model consists of $|\theta| = 316{,}161$ parameters stored as 32-bit floating point values, giving a per-transfer size of $4|\theta| = 1.26$~MB. The total communication cost over a full training run accumulates to approximately 25.8~GB for the final METR-LA configuration. Because adaptive client selection reduces the number of participating clients per round, it directly reduces upload communication while maintaining full cluster-model broadcasts for synchronization.
+
+\section{Reproducibility}
+\label{sec:reproducibility}
+
+To ensure reproducibility, all experiments used a fixed random seed of 42 for weight initialization, client profile assignment, and dropout simulation. The dataset was split chronologically (70/10/20) rather than randomly to prevent temporal leakage. The validation split was used for monitoring convergence during experimental tuning, while final metrics were reported only on the held-out test set. Training, validation, and test sets were kept identical across all ablation runs. The same GRU Seq2Seq architecture, preprocessing pipeline, and DTW cluster assignments were used across all comparable experiments unless explicitly stated otherwise in the ablation configuration. The source code was maintained in a version-controlled Git repository.
+
+The experiments can be reproduced by executing the preprocessing, clustering, and experiment scripts in sequence:
+
+\begin{enumerate}
+    \item \texttt{python scripts/prepare\_data.py} --- data preprocessing
+    \item \texttt{python scripts/run\_dtw\_clustering.py} --- DTW-based sensor clustering
+    \item \texttt{python scripts/run\_fl\_experiment.py [flags]} --- federated training with specified configuration
+\end{enumerate}
