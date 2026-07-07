@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HFL Traffic Prediction — Live Training Simulation</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #0a0e1a;
+    --bg-secondary: #111827;
+    --bg-card: #1a2035;
+    --bg-card-hover: #1f2847;
+    --border: #2a3555;
+    --text-primary: #e8ecf4;
+    --text-secondary: #8892a8;
+    --text-muted: #5a6580;
+    --accent: #60a5fa;
+    --accent-glow: rgba(96, 165, 250, 0.3);
+    --success: #34d399;
+    --warning: #fbbf24;
+    --danger: #f87171;
+
+    /* Cluster colors - vibrant palette */
+    --cluster-0: #f472b6;
+    --cluster-1: #60a5fa;
+    --cluster-2: #34d399;
+    --cluster-3: #fbbf24;
+    --cluster-4: #a78bfa;
+    --cluster-5: #fb923c;
+    --cluster-6: #2dd4bf;
+    --cluster-7: #f87171;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── HEADER ───────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 1000;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .header-logo {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+  }
+
+  .header-title {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #e8ecf4, #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .header-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-top: 2px;
+  }
+
+  .header-badge {
+    background: rgba(96, 165, 250, 0.15);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ─── MAIN LAYOUT ─────────────────────────── */
+  .main-container {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ─── LEFT PANEL ──────────────────────────── */
+  .left-panel {
+    width: 340px;
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-section-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+
+  /* Controls */
+  .controls-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 10px 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--accent);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+    border-color: transparent;
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  }
+
+  .btn-danger {
+    background: rgba(248, 113, 113, 0.15);
+    border-color: rgba(248, 113, 113, 0.3);
+    color: var(--danger);
+  }
+
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .speed-control label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .speed-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--border);
+    outline: none;
+  }
+
+  .speed-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    box-shadow: 0 0 8px var(--accent-glow);
+  }
+
+  .speed-val {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    min-width: 30px;
+    text-align: right;
+  }
+
+  /* Round display */
+  .round-display {
+    text-align: center;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.08), rgba(167, 139, 250, 0.08));
+    border-radius: 12px;
+    border: 1px solid rgba(96, 165, 250, 0.15);
+  }
+
+  .round-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 48px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+  }
+
+  .round-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+
+  .round-progress {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+
+  .round-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #60a5fa, #a78bfa);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  /* Metrics */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px;
+    transition: all 0.3s ease;
+  }
+
+  .metric-card.highlight {
+    border-color: var(--accent);
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 600;
+  }
+
+  .metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-top: 4px;
+  }
+
+  .metric-unit {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  .metric-delta {
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .metric-delta.positive { color: var(--success); }
+  .metric-delta.negative { color: var(--danger); }
+
+  /* Cluster legend */
+  .cluster-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .cluster-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: all 0.2s ease;
+    cursor: pointer;
+  }
+
+  .cluster-item:hover, .cluster-item.active {
+    border-color: var(--accent);
+    background: var(--bg-card-hover);
+  }
+
+  .cluster-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .cluster-name {
+    font-size: 12px;
+    font-weight: 600;
+    flex: 1;
+  }
+
+  .cluster-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .cluster-bar {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .cluster-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  /* ─── MAP CONTAINER ───────────────────────── */
+  .map-container {
+    flex: 1;
+    position: relative;
+  }
+
+  #map {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Leaflet dark style overrides */
+  .leaflet-tile-pane { filter: brightness(0.7) contrast(1.1) saturate(0.6) hue-rotate(180deg) invert(1); }
+  .leaflet-control-zoom a { background: var(--bg-card) !important; color: var(--text-primary) !important; border-color: var(--border) !important; }
+  .leaflet-control-attribution { background: rgba(10, 14, 26, 0.8) !important; color: var(--text-muted) !important; font-size: 9px !important; }
+  .leaflet-control-attribution a { color: var(--text-secondary) !important; }
+
+  /* ─── RIGHT PANEL (Chart) ──────────────────── */
+  .right-panel {
+    width: 360px;
+    background: var(--bg-secondary);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .chart-container {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-container.loss-section {
+    flex: 1;
+    min-height: 250px;
+  }
+
+  .chart-container.cluster-section {
+    flex: 0 0 auto;
+  }
+
+  .chart-wrapper {
+    flex: 1;
+    position: relative;
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin-top: 8px;
+    min-height: 180px;
+  }
+
+  .chart-wrapper.cluster-chart-wrapper {
+    min-height: 220px;
+    flex: 0 0 220px;
+  }
+
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  /* ─── LOG FEED ─────────────────────────────── */
+  .log-feed {
+    height: 200px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    overflow-y: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+  }
+
+  .log-entry {
+    opacity: 0;
+    animation: logFadeIn 0.3s ease forwards;
+  }
+
+  @keyframes logFadeIn {
+    to { opacity: 1; }
+  }
+
+  .log-time { color: var(--text-muted); }
+  .log-event { color: var(--accent); }
+  .log-value { color: var(--success); }
+  .log-warn { color: var(--warning); }
+  .log-comm { color: #a78bfa; }
+
+  /* ─── STATUS BAR ───────────────────────────── */
+  .status-bar {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 6px 24px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-right: 6px;
+    display: inline-block;
+  }
+
+  .status-indicator.active {
+    background: var(--success);
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* ─── SENSOR MARKERS ──────────────────────── */
+  .sensor-marker {
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.4);
+    transition: all 0.4s ease;
+    box-shadow: 0 0 6px rgba(0,0,0,0.3);
+  }
+
+  .sensor-marker.active {
+    animation: sensorPulse 1.5s ease infinite;
+    border-color: rgba(255,255,255,0.9);
+  }
+
+  .sensor-marker.inactive {
+    opacity: 0.25;
+    border-color: rgba(255,255,255,0.1);
+    transform: scale(0.7);
+  }
+
+  @keyframes sensorPulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(0,0,0,0.3); }
+    50% { box-shadow: 0 0 20px currentColor, 0 0 40px currentColor; }
+  }
+
+  /* ─── DATA FLOW LINES ─────────────────────── */
+  .flow-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 600;
+  }
+
+  /* ─── PHASE INDICATOR ──────────────────────── */
+  .phase-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 10px;
+  }
+
+  .phase-badge.selecting {
+    background: rgba(251, 191, 36, 0.15);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+    color: var(--warning);
+  }
+
+  .phase-badge.training {
+    background: rgba(96, 165, 250, 0.15);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: var(--accent);
+  }
+
+  .phase-badge.aggregating {
+    background: rgba(167, 139, 250, 0.15);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    color: #a78bfa;
+  }
+
+  .phase-badge.syncing {
+    background: rgba(52, 211, 153, 0.15);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+    color: var(--success);
+  }
+
+  .phase-badge.idle {
+    background: rgba(90, 101, 128, 0.15);
+    border: 1px solid rgba(90, 101, 128, 0.3);
+    color: var(--text-muted);
+  }
+
+  .phase-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  /* ─── ANIMATION OVERLAY ────────────────────── */
+  .agg-line {
+    stroke-dasharray: 8 4;
+    animation: dashFlow 1s linear infinite;
+  }
+
+  @keyframes dashFlow {
+    to { stroke-dashoffset: -12; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-logo">🛰️</div>
+    <div>
+      <div class="header-title">Hierarchical Federated Learning — Traffic Flow Prediction</div>
+      <div class="header-subtitle">METR-LA • 207 Sensors • 8 DTW Clusters • GRU Seq2Seq</div>
+    </div>
+  </div>
+  <div class="header-badge">LIVE SIMULATION</div>
+</div>
+
+<!-- MAIN -->
+<div class="main-container">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- Controls -->
+    <div class="panel-section">
+      <div class="panel-section-title">Simulation Controls</div>
+      <div class="controls-row">
+        <button class="btn btn-primary" id="btnPlay" onclick="togglePlay()">▶ Play</button>
+        <button class="btn" id="btnStep" onclick="stepRound()">⏭ Step</button>
+        <button class="btn btn-danger" id="btnReset" onclick="resetSimulation()">↺ Reset</button>
+      </div>
+      <div class="speed-control">
+        <label>Speed</label>
+        <input type="range" class="speed-slider" id="speedSlider" min="200" max="3000" value="1200" oninput="updateSpeed(this.value)">
+        <span class="speed-val" id="speedVal">1.2s</span>
+      </div>
+    </div>
+
+    <!-- Round Display -->
+    <div class="panel-section">
+      <div class="round-display">
+        <div class="round-number" id="roundNumber">0</div>
+        <div class="round-label">Communication Round</div>
+        <div class="round-progress"><div class="round-progress-fill" id="progressFill" style="width:0%"></div></div>
+        <div class="phase-badge idle" id="phaseBadge">
+          <div class="phase-dot"></div>
+          <span id="phaseText">IDLE</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Metrics -->
+    <div class="panel-section">
+      <div class="panel-section-title">Live Metrics</div>
+      <div class="metrics-grid">
+        <div class="metric-card" id="metricLoss">
+          <div class="metric-label">Avg Loss</div>
+          <div class="metric-value" id="valLoss">—</div>
+          <div class="metric-delta" id="deltaLoss"></div>
+        </div>
+        <div class="metric-card" id="metricComm">
+          <div class="metric-label">Comm Cost</div>
+          <div class="metric-value" id="valComm">0 <span class="metric-unit">GB</span></div>
+        </div>
+        <div class="metric-card" id="metricActive">
+          <div class="metric-label">Active Clients</div>
+          <div class="metric-value" id="valActive">0 <span class="metric-unit">/ 207</span></div>
+        </div>
+        <div class="metric-card" id="metricParticipation">
+          <div class="metric-label">Participation</div>
+          <div class="metric-value" id="valParticipation">0<span class="metric-unit">%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cluster Legend -->
+    <div class="panel-section" style="flex:1;overflow-y:auto">
+      <div class="panel-section-title">DTW Clusters (K=8)</div>
+      <div class="cluster-list" id="clusterList"></div>
+    </div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-container">
+    <div id="map"></div>
+    <svg class="flow-overlay" id="flowOverlay"></svg>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="chart-container loss-section">
+      <div class="panel-section-title">Training Loss Convergence</div>
+      <div class="chart-wrapper">
+        <canvas id="lossChart"></canvas>
+      </div>
+    </div>
+    <div class="chart-container cluster-section">
+      <div class="panel-section-title">Per-Cluster Activity</div>
+      <div class="chart-wrapper cluster-chart-wrapper">
+        <canvas id="clusterChart"></canvas>
+      </div>
+    </div>
+    <div class="log-feed" id="logFeed">
+      <div class="log-entry"><span class="log-time">[00:00]</span> <span class="log-event">System initialized.</span> 207 sensors loaded across 8 DTW clusters.</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar">
+  <span><span class="status-indicator" id="statusDot"></span><span id="statusText">Ready</span></span>
+  <span>Dataset: METR-LA</span>
+  <span>Model: GRU Seq2Seq (316K params)</span>
+  <span>Framework: Hierarchical FedAvg + DTW + Quality Weighting</span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  DATA — embedded from actual METR-LA experiments
+// ═══════════════════════════════════════════════════════════════
+
+const SENSORS = [
+  [34.15497,-118.31829],[34.11621,-118.23799],[34.11641,-118.23819],[34.07248,-118.26772],[34.07142,-118.26572],
+  [34.06913,-118.25932],[34.05368,-118.23369],[34.13486,-118.22932],[34.20264,-118.47352],[34.15562,-118.4686],
+  [34.16415,-118.38223],[34.15691,-118.22469],[34.07821,-118.28795],[34.1566,-118.30266],[34.18949,-118.47437],
+  [34.07006,-118.26246],[34.07314,-118.23388],[34.07732,-118.28186],[34.20672,-118.19992],[34.12095,-118.33911],
+  [34.12073,-118.33928],[34.20584,-118.19803],[34.12634,-118.34482],[34.05767,-118.21435],[34.15478,-118.27076],
+  [34.12121,-118.27164],[34.09478,-118.47605],[34.12967,-118.22871],[34.12964,-118.22901],[34.0839,-118.22086],
+  [34.08374,-118.22076],[34.17878,-118.39469],[34.11027,-118.33441],[34.06664,-118.25397],[34.18784,-118.47407],
+  [34.20699,-118.20237],[34.15359,-118.34043],[34.15541,-118.29575],[34.06712,-118.23973],[34.12659,-118.34465],
+  [34.15118,-118.3748],[34.16498,-118.47493],[34.15262,-118.28034],[34.1593,-118.46483],[34.14769,-118.20137],
+  [34.14747,-118.20123],[34.18555,-118.21733],[34.1566,-118.42216],[34.07505,-118.23256],[34.10658,-118.25544],
+  [34.20663,-118.20101],[34.15407,-118.28711],[34.15664,-118.41326],[34.15597,-118.2666],[34.15522,-118.29344],
+  [34.15699,-118.22436],[34.09579,-118.24427],[34.12881,-118.34684],[34.15544,-118.29344],[34.21216,-118.47341],
+  [34.15555,-118.43908],[34.15297,-118.37226],[34.15362,-118.28441],[34.15574,-118.43931],[34.09335,-118.20635],
+  [34.09335,-118.20616],[34.18555,-118.21766],[34.15367,-118.3484],[34.13338,-118.3535],[34.15685,-118.41456],
+  [34.14745,-118.37124],[34.14761,-118.3711],[34.15459,-118.37935],[34.15434,-118.39618],[34.13286,-118.35135],
+  [34.15571,-118.43273],[34.15666,-118.44808],[34.16789,-118.46896],[34.11296,-118.24489],[34.12302,-118.22889],
+  [34.07898,-118.28911],[34.15843,-118.45664],[34.15818,-118.45658],[34.17886,-118.39497],[34.17091,-118.46775],
+  [34.13486,-118.22969],[34.17126,-118.50495],[34.17109,-118.50495],[34.18011,-118.47045],[34.18022,-118.47022],
+  [34.2,-118.40337],[34.05773,-118.24348],[34.16556,-118.22432],[34.05759,-118.24357],[34.11684,-118.33698],
+  [34.14224,-118.27812],[34.10634,-118.32826],[34.10478,-118.32497],[34.12974,-118.34809],[34.20164,-118.40366],
+  [34.16928,-118.49872],[34.09017,-118.23849],[34.13876,-118.36438],[34.13561,-118.36006],[34.1722,-118.46753],
+  [34.16339,-118.2253],[34.1491,-118.2257],[34.14347,-118.22704],[34.14352,-118.22733],[34.14226,-118.27786],
+  [34.15648,-118.24674],[34.15247,-118.2852],[34.16588,-118.29809],[34.15451,-118.39699],[34.15559,-118.2957],
+  [34.15384,-118.325],[34.15351,-118.32751],[34.15326,-118.35921],[34.15302,-118.35921],[34.13401,-118.35506],
+  [34.12769,-118.27372],[34.20983,-118.22351],[34.17154,-118.38812],[34.11439,-118.24209],[34.0593,-118.21451],
+  [34.14847,-118.27969],[34.21846,-118.23931],[34.10045,-118.31601],[34.10054,-118.31581],[34.11521,-118.26825],
+  [34.16037,-118.47012],[34.16378,-118.47224],[34.13904,-118.22862],[34.09458,-118.24279],[34.08581,-118.23182],
+  [34.11059,-118.24819],[34.06491,-118.25126],[34.15679,-118.42222],[34.06871,-118.23661],[34.11167,-118.26501],
+  [34.15403,-118.34232],[34.15677,-118.40424],[34.15641,-118.30266],[34.15469,-118.31253],[34.06461,-118.25102],
+  [34.15546,-118.30841],[34.16521,-118.47484],[34.12199,-118.27178],[34.16519,-118.49166],[34.21979,-118.40931],
+  [34.17112,-118.51814],[34.18529,-118.47395],[34.14511,-118.21587],[34.14483,-118.21587],[34.0971,-118.31366],
+  [34.09699,-118.31381],[34.17169,-118.38801],[34.09373,-118.30907],[34.16028,-118.46808],[34.09359,-118.30918],
+  [34.08558,-118.30174],[34.08571,-118.30161],[34.09004,-118.3059],[34.08993,-118.30607],[34.15655,-118.40441],
+  [34.05987,-118.21492],[34.07828,-118.22834],[34.15646,-118.26092],[34.15627,-118.25506],[34.1562,-118.26359],
+  [34.08406,-118.22974],[34.15402,-118.23893],[34.16903,-118.49885],[34.15564,-118.24188],[34.04301,-118.21724],
+  [34.13583,-118.35993],[34.16421,-118.38246],[34.11966,-118.23143],[34.14584,-118.22251],[34.14559,-118.22251],
+  [34.17128,-118.51976],[34.17339,-118.5368],[34.22164,-118.47307],[34.10377,-118.24992],[34.10377,-118.24962],
+  [34.20112,-118.47361],[34.20264,-118.47326],[34.08265,-118.29755],[34.08294,-118.29729],[34.21356,-118.23113],
+  [34.1527,-118.3754],[34.07488,-118.27362],[34.07502,-118.27356],[34.07696,-118.28093],[34.17115,-118.30539],
+  [34.08102,-118.29325],[34.07787,-118.22871],[34.16526,-118.47985],[34.1027,-118.3173],[34.15397,-118.34172],
+  [34.19638,-118.18442],[34.14929,-118.23182],[34.14604,-118.2243],[34.14163,-118.1829],[34.16542,-118.47985],
+  [34.15133,-118.37456],[34.10262,-118.31747]
+];
+
+const CLUSTER_LABELS = [7,3,5,4,2,4,4,3,7,5,3,7,2,7,5,2,2,4,3,4,7,3,0,1,4,1,4,3,4,5,7,7,7,4,4,3,7,4,0,4,5,0,4,0,7,3,3,0,0,3,3,1,0,3,4,3,2,4,7,7,0,0,7,0,5,4,3,7,5,0,5,3,0,0,4,0,0,5,5,4,4,0,0,7,5,5,0,0,5,4,7,2,3,4,4,4,7,4,0,3,0,1,5,5,4,6,3,3,7,0,7,4,0,0,7,7,7,0,7,4,6,3,5,7,1,1,3,5,4,0,4,4,7,4,0,4,4,0,4,1,4,0,4,7,2,4,0,6,0,4,0,5,3,7,4,5,3,4,0,5,2,4,4,0,0,1,3,7,7,3,1,3,0,3,1,4,5,3,7,3,0,7,4,5,3,7,4,2,4,3,4,2,4,2,3,4,4,0,4,4,3,7,3,3,0,7,5];
+
+const ROUND_LOSSES = [0.8455,0.5352,0.5096,0.5077,0.4930,0.4903,0.5041,0.4885,0.4918,0.4847,0.4841,0.4843,0.4786,0.4656,0.4665,0.4771,0.4645,0.4648,0.4642,0.4724,0.4769,0.4737,0.4628,0.4719,0.4572,0.4516,0.4557,0.4552,0.4542,0.4438,0.4489,0.4490,0.4498,0.4376,0.4523,0.4451,0.4581,0.4489,0.4489,0.4453,0.4533,0.4336,0.4326,0.4393,0.4371,0.4331,0.4513,0.4532,0.4356,0.4314,0.4501,0.4516,0.4445,0.4379,0.4422,0.4498,0.4398,0.4387,0.4386,0.4470];
+
+const CLUSTER_COLORS = ['#f472b6','#60a5fa','#34d399','#fbbf24','#a78bfa','#fb923c','#2dd4bf','#f87171'];
+const CLUSTER_NAMES = ['Cluster 0','Cluster 1','Cluster 2','Cluster 3','Cluster 4','Cluster 5','Cluster 6','Cluster 7'];
+const TOTAL_ROUNDS = 60;
+const TOTAL_COMM_GB = 25.8;
+const AVG_PARTICIPATION = 0.74;
+const MODEL_SIZE_MB = 1.26;
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════════════════
+let currentRound = 0;
+let isPlaying = false;
+let playInterval = null;
+let animSpeed = 1200;
+let sensorMarkers = [];
+let activeSensors = new Set();
+let lossHistory = [];
+let map;
+
+
+// ═══════════════════════════════════════════════════════════════
+//  INITIALIZATION
+// ═══════════════════════════════════════════════════════════════
+
+// Cluster stats
+const clusterSizes = Array(8).fill(0);
+CLUSTER_LABELS.forEach(c => clusterSizes[c]++);
+
+function initMap() {
+  map = L.map('map', {
+    center: [34.14, -118.35],
+    zoom: 12,
+    zoomControl: true,
+    attributionControl: true
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    maxZoom: 19
+  }).addTo(map);
+
+  // Remove the dark invert filter since we're using dark tiles
+  document.querySelector('.leaflet-tile-pane').style.filter = 'none';
+
+  // Add sensor markers
+  SENSORS.forEach((coords, i) => {
+    const cluster = CLUSTER_LABELS[i];
+    const color = CLUSTER_COLORS[cluster];
+    const marker = L.circleMarker([coords[0], coords[1]], {
+      radius: 5,
+      fillColor: color,
+      color: 'rgba(255,255,255,0.3)',
+      weight: 1.5,
+      opacity: 1,
+      fillOpacity: 0.8,
+      className: 'sensor-marker'
+    }).addTo(map);
+
+    marker.bindTooltip(`<b>Sensor ${i}</b><br>${CLUSTER_NAMES[cluster]}<br>Lat: ${coords[0].toFixed(4)}<br>Lng: ${coords[1].toFixed(4)}`, {
+      className: 'sensor-tooltip',
+      direction: 'top'
+    });
+
+    sensorMarkers.push(marker);
+  });
+}
+
+function initClusterList() {
+  const container = document.getElementById('clusterList');
+  container.innerHTML = '';
+  for (let c = 0; c < 8; c++) {
+    const item = document.createElement('div');
+    item.className = 'cluster-item';
+    item.id = `cluster-${c}`;
+    item.innerHTML = `
+      <div class="cluster-dot" style="background:${CLUSTER_COLORS[c]}"></div>
+      <div class="cluster-name">${CLUSTER_NAMES[c]}</div>
+      <div class="cluster-count">${clusterSizes[c]} sensors</div>
+      <div class="cluster-bar"><div class="cluster-bar-fill" id="clusterBar-${c}" style="width:0%;background:${CLUSTER_COLORS[c]}"></div></div>
+    `;
+    container.appendChild(item);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CHART DRAWING (pure canvas, no dependencies)
+// ═══════════════════════════════════════════════════════════════
+
+function drawLossChart() {
+  const canvas = document.getElementById('lossChart');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  ctx.scale(2, 2);
+  const w = rect.width, h = rect.height;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const pad = { top: 30, right: 20, bottom: 35, left: 55 };
+  const pw = w - pad.left - pad.right;
+  const ph = h - pad.top - pad.bottom;
+
+  // Grid
+  ctx.strokeStyle = '#1f2847';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.top + (ph * i / 5);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+  }
+
+  // Y labels
+  const yMin = 0.35, yMax = 0.90;
+  ctx.fillStyle = '#5a6580';
+  ctx.font = '10px JetBrains Mono';
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const val = yMax - (yMax - yMin) * i / 5;
+    const y = pad.top + (ph * i / 5);
+    ctx.fillText(val.toFixed(2), pad.left - 8, y + 4);
+  }
+
+  // X labels
+  ctx.textAlign = 'center';
+  for (let r = 0; r <= 60; r += 10) {
+    const x = pad.left + (r / 60) * pw;
+    ctx.fillText(r.toString(), x, h - pad.bottom + 18);
+  }
+
+  // Axis labels
+  ctx.fillStyle = '#8892a8';
+  ctx.font = '11px Inter';
+  ctx.textAlign = 'center';
+  ctx.fillText('Communication Round', w / 2, h - 4);
+  ctx.save();
+  ctx.translate(14, h / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText('Avg Training Loss', 0, 0);
+  ctx.restore();
+
+  if (lossHistory.length === 0) return;
+
+  // Loss line
+  ctx.beginPath();
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  lossHistory.forEach((val, i) => {
+    const x = pad.left + ((i + 1) / 60) * pw;
+    const y = pad.top + ((yMax - val) / (yMax - yMin)) * ph;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + ph);
+  grad.addColorStop(0, 'rgba(96,165,250,0.15)');
+  grad.addColorStop(1, 'rgba(96,165,250,0)');
+  ctx.lineTo(pad.left + (lossHistory.length / 60) * pw, pad.top + ph);
+  ctx.lineTo(pad.left + (1 / 60) * pw, pad.top + ph);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Current point
+  if (lossHistory.length > 0) {
+    const lastVal = lossHistory[lossHistory.length - 1];
+    const lx = pad.left + (lossHistory.length / 60) * pw;
+    const ly = pad.top + ((yMax - lastVal) / (yMax - yMin)) * ph;
+    ctx.beginPath();
+    ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#60a5fa';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Value label
+    ctx.fillStyle = '#e8ecf4';
+    ctx.font = 'bold 11px JetBrains Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(lastVal.toFixed(4), lx + 8, ly - 6);
+  }
+}
+
+function drawClusterChart() {
+  const canvas = document.getElementById('clusterChart');
+  const ctx = canvas.getContext('2d');
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = rect.width * 2;
+  canvas.height = rect.height * 2;
+  ctx.scale(2, 2);
+  const w = rect.width, h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const pad = { top: 20, right: 50, bottom: 30, left: 50 };
+  const pw = w - pad.left - pad.right;
+  const ph = h - pad.top - pad.bottom;
+  const barH = Math.min(ph / 8 - 4, 20);
+
+  // Count active per cluster
+  const activeCounts = Array(8).fill(0);
+  activeSensors.forEach(idx => {
+    activeCounts[CLUSTER_LABELS[idx]]++;
+  });
+
+  for (let c = 0; c < 8; c++) {
+    const y = pad.top + c * (ph / 8) + (ph / 16) - barH / 2;
+    const pct = clusterSizes[c] > 0 ? activeCounts[c] / clusterSizes[c] : 0;
+    const barW = pct * pw;
+
+    // Label
+    ctx.fillStyle = '#5a6580';
+    ctx.font = '10px JetBrains Mono';
+    ctx.textAlign = 'right';
+    ctx.fillText(`C${c}`, pad.left - 8, y + barH / 2 + 4);
+
+    // Background bar
+    ctx.fillStyle = '#1f2847';
+    ctx.beginPath();
+    ctx.roundRect(pad.left, y, pw, barH, 3);
+    ctx.fill();
+
+    // Active bar
+    if (barW > 0) {
+      ctx.fillStyle = CLUSTER_COLORS[c];
+      ctx.globalAlpha = 0.8;
+      ctx.beginPath();
+      ctx.roundRect(pad.left, y, barW, barH, 3);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+
+    // Count text
+    ctx.fillStyle = '#8892a8';
+    ctx.font = '9px JetBrains Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${activeCounts[c]}/${clusterSizes[c]}`, pad.left + pw + 4, y + barH / 2 + 3);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SIMULATION LOGIC
+// ═══════════════════════════════════════════════════════════════
+
+function simulateClientSelection() {
+  activeSensors.clear();
+  // Simulate adaptive selection with ~74% participation
+  for (let i = 0; i < 207; i++) {
+    // Per-cluster: ensure at least 50% floor
+    const cluster = CLUSTER_LABELS[i];
+    if (Math.random() < AVG_PARTICIPATION) {
+      activeSensors.add(i);
+    }
+  }
+
+  // Ensure 50% floor per cluster
+  for (let c = 0; c < 8; c++) {
+    const clusterSensors = [];
+    CLUSTER_LABELS.forEach((cl, idx) => { if (cl === c) clusterSensors.push(idx); });
+    const activeInCluster = clusterSensors.filter(idx => activeSensors.has(idx)).length;
+    const minRequired = Math.ceil(clusterSensors.length * 0.5);
+    if (activeInCluster < minRequired) {
+      const inactive = clusterSensors.filter(idx => !activeSensors.has(idx));
+      for (let j = 0; j < minRequired - activeInCluster && j < inactive.length; j++) {
+        activeSensors.add(inactive[j]);
+      }
+    }
+  }
+}
+
+function updateMarkers() {
+  sensorMarkers.forEach((marker, i) => {
+    const isActive = activeSensors.has(i);
+    const color = CLUSTER_COLORS[CLUSTER_LABELS[i]];
+    marker.setStyle({
+      radius: isActive ? 7 : 4,
+      fillOpacity: isActive ? 0.95 : 0.2,
+      opacity: isActive ? 1 : 0.3,
+      weight: isActive ? 2.5 : 1,
+      color: isActive ? '#ffffff' : 'rgba(255,255,255,0.1)',
+      fillColor: color
+    });
+  });
+}
+
+
+async function runRound() {
+  if (currentRound >= TOTAL_ROUNDS) {
+    stopPlay();
+    addLog('Training complete!', 'event', '🎉');
+    setPhase('idle', 'COMPLETE');
+    return;
+  }
+
+  // Phase 1: Client Selection
+  setPhase('selecting', 'SELECTING CLIENTS');
+  simulateClientSelection();
+  updateMarkers();
+  drawClusterChart();
+  const activeCount = activeSensors.size;
+  document.getElementById('valActive').innerHTML = `${activeCount} <span class="metric-unit">/ 207</span>`;
+  document.getElementById('valParticipation').innerHTML = `${Math.round(activeCount/207*100)}<span class="metric-unit">%</span>`;
+  addLog(`Round ${currentRound + 1}: Selected ${activeCount} clients (${Math.round(activeCount/207*100)}%)`, 'warn');
+
+  await delay(animSpeed * 0.25);
+
+  // Phase 2: Local Training
+  setPhase('training', 'LOCAL TRAINING');
+  addLog(`Local training: 20 steps, LR=${currentRound >= 40 ? '0.00025' : currentRound >= 50 ? '0.0001' : '0.0005'}`, 'event');
+
+  await delay(animSpeed * 0.25);
+
+  // Phase 3: Intra-cluster Aggregation
+  setPhase('aggregating', 'QUALITY-WEIGHTED AGG');
+  const loss = ROUND_LOSSES[currentRound];
+  lossHistory.push(loss);
+
+  const prevLoss = currentRound > 0 ? ROUND_LOSSES[currentRound - 1] : null;
+  const deltaLoss = prevLoss ? ((loss - prevLoss) / prevLoss * 100).toFixed(2) : null;
+
+  document.getElementById('valLoss').textContent = loss.toFixed(4);
+  if (deltaLoss !== null) {
+    const el = document.getElementById('deltaLoss');
+    el.textContent = `${parseFloat(deltaLoss) > 0 ? '+' : ''}${deltaLoss}%`;
+    el.className = `metric-delta ${parseFloat(deltaLoss) > 0 ? 'negative' : 'positive'}`;
+  }
+
+  const commSoFar = (TOTAL_COMM_GB * (currentRound + 1) / TOTAL_ROUNDS).toFixed(1);
+  document.getElementById('valComm').innerHTML = `${commSoFar} <span class="metric-unit">GB</span>`;
+
+  addLog(`Aggregated: loss=${loss.toFixed(4)} | comm=${commSoFar} GB`, 'value');
+  drawLossChart();
+
+  await delay(animSpeed * 0.25);
+
+  // Phase 4: Hierarchical Sync
+  setPhase('syncing', 'HIERARCHICAL SYNC');
+  addLog(`Inter-cluster sync: α=0.9, DTW-weighted`, 'comm');
+
+  // Update cluster bars
+  for (let c = 0; c < 8; c++) {
+    const bar = document.getElementById(`clusterBar-${c}`);
+    const progress = Math.min(100, ((currentRound + 1) / TOTAL_ROUNDS) * 100 + Math.random() * 10);
+    bar.style.width = `${progress}%`;
+  }
+
+  await delay(animSpeed * 0.25);
+
+  // Advance round
+  currentRound++;
+  document.getElementById('roundNumber').textContent = currentRound;
+  document.getElementById('progressFill').style.width = `${(currentRound / TOTAL_ROUNDS) * 100}%`;
+
+  if (!isPlaying) {
+    setPhase('idle', 'PAUSED');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CONTROLS
+// ═══════════════════════════════════════════════════════════════
+
+function togglePlay() {
+  if (isPlaying) {
+    stopPlay();
+  } else {
+    startPlay();
+  }
+}
+
+function startPlay() {
+  if (currentRound >= TOTAL_ROUNDS) return;
+  isPlaying = true;
+  document.getElementById('btnPlay').innerHTML = '⏸ Pause';
+  document.getElementById('statusDot').className = 'status-indicator active';
+  document.getElementById('statusText').textContent = 'Training in progress...';
+  playLoop();
+}
+
+async function playLoop() {
+  while (isPlaying && currentRound < TOTAL_ROUNDS) {
+    await runRound();
+  }
+  if (currentRound >= TOTAL_ROUNDS) {
+    stopPlay();
+    document.getElementById('statusText').textContent = 'Training complete — 60 rounds finished';
+  }
+}
+
+function stopPlay() {
+  isPlaying = false;
+  document.getElementById('btnPlay').innerHTML = '▶ Play';
+  document.getElementById('statusDot').className = 'status-indicator';
+  if (currentRound < TOTAL_ROUNDS) {
+    document.getElementById('statusText').textContent = 'Paused';
+    setPhase('idle', 'PAUSED');
+  }
+}
+
+async function stepRound() {
+  if (currentRound >= TOTAL_ROUNDS) return;
+  stopPlay();
+  await runRound();
+  setPhase('idle', 'PAUSED');
+}
+
+function resetSimulation() {
+  stopPlay();
+  currentRound = 0;
+  lossHistory = [];
+  activeSensors.clear();
+  document.getElementById('roundNumber').textContent = '0';
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('valLoss').textContent = '—';
+  document.getElementById('deltaLoss').textContent = '';
+  document.getElementById('valComm').innerHTML = '0 <span class="metric-unit">GB</span>';
+  document.getElementById('valActive').innerHTML = '0 <span class="metric-unit">/ 207</span>';
+  document.getElementById('valParticipation').innerHTML = '0<span class="metric-unit">%</span>';
+  document.getElementById('logFeed').innerHTML = '<div class="log-entry"><span class="log-time">[00:00]</span> <span class="log-event">Simulation reset.</span> Ready.</div>';
+  document.getElementById('statusText').textContent = 'Ready';
+  setPhase('idle', 'IDLE');
+
+  // Reset markers
+  sensorMarkers.forEach((marker, i) => {
+    marker.setStyle({
+      radius: 5, fillOpacity: 0.8, opacity: 1, weight: 1.5,
+      color: 'rgba(255,255,255,0.3)', fillColor: CLUSTER_COLORS[CLUSTER_LABELS[i]]
+    });
+  });
+
+  // Reset cluster bars
+  for (let c = 0; c < 8; c++) {
+    document.getElementById(`clusterBar-${c}`).style.width = '0%';
+  }
+
+  drawLossChart();
+  drawClusterChart();
+}
+
+function updateSpeed(val) {
+  animSpeed = parseInt(val);
+  document.getElementById('speedVal').textContent = (animSpeed / 1000).toFixed(1) + 's';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function setPhase(cls, text) {
+  const badge = document.getElementById('phaseBadge');
+  badge.className = `phase-badge ${cls}`;
+  document.getElementById('phaseText').textContent = text;
+}
+
+function addLog(msg, type, icon) {
+  const feed = document.getElementById('logFeed');
+  const time = String(currentRound).padStart(2, '0');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">[R${time}]</span> ${icon ? icon + ' ' : ''}<span class="log-${type}">${msg}</span>`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+
+  // Keep last 50 entries
+  while (feed.children.length > 50) feed.removeChild(feed.firstChild);
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ═══════════════════════════════════════════════════════════════
+
+window.addEventListener('load', () => {
+  initMap();
+  initClusterList();
+  drawLossChart();
+  drawClusterChart();
+});
+
+window.addEventListener('resize', () => {
+  drawLossChart();
+  drawClusterChart();
+});
+</script>
+</body>
+</html>

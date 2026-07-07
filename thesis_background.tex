@@ -11,7 +11,7 @@ With the growth of deep learning, traffic forecasting shifted toward neural arch
 
 To explicitly model spatial dependencies among road sensors, researchers introduced Spatio-Temporal Graph Neural Networks (STGNNs). Li et al. \cite{li2018} proposed the Diffusion Convolutional Recurrent Neural Network (DCRNN), which models traffic speed forecasting as a diffusion process over a directed graph and popularized the METR-LA benchmark dataset used in this thesis. Wu et al. \cite{wu2019graphwavenet} introduced Graph WaveNet, combining adaptive adjacency learning with dilated temporal convolutions. Guo et al. \cite{guo2019} proposed ASTGCN, which applies attention mechanisms to capture dynamic spatial and temporal correlations. More recent graph-based models, such as AGCN \cite{qi2023fedagcn}, further account for asynchronous spatial-temporal dependencies, where the influence of neighboring nodes propagates with time delays.
 
-Although STGNN-based methods achieve strong centralized forecasting performance, they typically assume that all sensor observations and graph structures are available at a central server. This assumption becomes increasingly difficult to maintain in large-scale ITS deployments, where continuous data transmission creates communication overhead and limits the use of distributed edge resources. These limitations motivate the use of Federated Learning for decentralized traffic forecasting.
+Although STGNN-based methods often achieve strong centralized forecasting performance, they typically assume that all sensor observations and graph structures are available at a central server. This assumption becomes increasingly difficult to maintain in large-scale ITS deployments, where continuous data transmission creates communication overhead and limits the use of distributed edge resources. These limitations motivate the use of Federated Learning for decentralized traffic forecasting.
 
 \section{Federated Learning in Intelligent Transportation Systems}
 
@@ -23,7 +23,7 @@ The following sections review existing work addressing these two challenges thro
 
 \subsection{Data Heterogeneity and Non-IID Traffic Distributions}
 
-A major challenge in FL is statistical heterogeneity, where client datasets are non-Independent and Identically Distributed (non-IID). In traffic prediction, this problem is especially pronounced. Highway sensors often observe high-speed, low-variance traffic patterns, while urban or arterial sensors may exhibit stop-and-go dynamics, congestion peaks, and stronger temporal variability. When standard FedAvg is applied to such heterogeneous clients, local updates may move the global model in conflicting directions, a phenomenon commonly referred to as \textit{client drift} \cite{zhao2018, karimireddy2020}.
+A major challenge in FL is statistical heterogeneity, where client datasets are non-independent and identically distributed (non-IID). In traffic prediction, this problem is especially pronounced. Highway sensors often observe high-speed, low-variance traffic patterns, while urban or arterial sensors may exhibit stop-and-go dynamics, congestion peaks, and stronger temporal variability. When standard FedAvg is applied to such heterogeneous clients, local updates may move the global model in conflicting directions, a phenomenon commonly referred to as \textit{client drift} \cite{zhao2018, karimireddy2020}.
 
 General-purpose FL methods address non-IID data using several strategies. FedProx \cite{li2020fedprox} regularizes local training by penalizing excessive deviation from the global model. SCAFFOLD \cite{karimireddy2020} corrects client drift using control variates, while MOON \cite{li2021moon} aligns local and global representations through model-contrastive learning. More recent work has explored adaptive regularization mechanisms that adjust to the severity of client distribution shift \cite{cha2025}. These approaches improve stability under heterogeneous data, but they are not specifically designed around the spatial and temporal structure of traffic sensor networks.
 
@@ -62,14 +62,107 @@ Several studies have directly applied FL to traffic flow prediction. FedGRU \cit
 
 Recent graph-based FL methods have improved the ability to recover spatial dependencies under decentralized settings. FedGTP \cite{yang2024fedgtp} uses adaptive polynomial mechanisms to model inter-client spatial dependencies under privacy constraints. FedGM \cite{wang2024fedgm} combines graph federated learning with meta-learning to support adaptation to unseen traffic network structures. FedHINT \cite{zhou2026fedhint} addresses the loss of global spatial information by constructing proxy nodes that approximate cross-regional dependencies while still avoiding raw feature sharing.
 
+Recent work has further expanded federated traffic forecasting toward adaptive spatial-temporal modeling, cross-city personalization, and causal disentanglement. FedASTA \cite{chen2024fedasta} introduces a federated adaptive spatial-temporal attention framework that constructs adaptive temporal-spatial relations between clients at the server level, showing the importance of dynamic spatial dependencies under FL. pFedCTP \cite{zhang2024pfedctp} addresses cross-city traffic prediction using personalized federated learning, where knowledge from data-rich source cities is transferred to data-scarce target cities while accounting for spatio-temporal heterogeneity and client drift. FedGDAN \cite{li2025fedgdan} combines graph diffusion attention with an adaptive local aggregation mechanism for privacy-preserving traffic flow prediction. FedDis \cite{zhou2026feddis} uses causal disentanglement to separate local dynamics from global patterns through a dual-branch architecture, enabling personalized spatial-temporal prediction while preserving cross-client knowledge transfer. These methods confirm the growing importance of personalization and spatial dependency recovery in federated traffic forecasting. However, they also rely on more complex graph, attention, or cross-city transfer mechanisms, whereas this thesis focuses on a lightweight sensor-level hierarchical FL framework with explicit communication accounting.
+
 These methods demonstrate the growing importance of FL for traffic forecasting. However, many of the strongest approaches rely on graph reconstruction, proxy-node generation, or complex spatio-temporal backbones. While effective, such designs can increase architectural complexity and communication cost, making them less suitable for lightweight edge-based deployments.
+
+Tables~\ref{tab:fed_recurrent} and~\ref{tab:fed_graph} summarize representative federated traffic prediction methods reviewed in this chapter, grouped by architectural direction.
+
+\begin{table}[H]
+\centering
+\caption{Recurrent, clustering-based, and communication-efficient federated traffic prediction methods.}
+\label{tab:fed_recurrent}
+\small
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
+
+\begin{tabularx}{\textwidth}{p{1.8cm} p{2.2cm} Y Y}
+\toprule
+\textbf{Method} & \textbf{Direction} & \textbf{Architecture / Main Idea} & \textbf{Relevance / Limitation} \\
+\midrule
+
+FedGRU \cite{liu2020fedgru}
+& Recurrent FL baseline
+& GRU-based federated traffic forecasting.
+& Early recurrent FL baseline; does not address clustering, hierarchy, or adaptive selection. \\
+
+CMBA-FL \cite{zhu2025cmba}
+& Comm.-efficient recurrent FL
+& GRU Encoder-Decoder with parameter relevance selection.
+& Demonstrates that lightweight recurrent backbones can achieve competitive accuracy--communication trade-offs. \\
+
+FedTFP \cite{feng2024}
+& Clustering-based FL
+& DTW and K-Means partitioning for federated traffic prediction.
+& Shows the usefulness of temporal-pattern clustering, but focuses on partitioning rather than hierarchical inter-cluster sharing. \\
+
+pFedCTP \cite{zhang2024pfedctp}
+& Personalized cross-city FL
+& ST-Net decoupling with adaptive parameter interpolation for cross-city transfer.
+& Addresses cross-city heterogeneity and client drift, but targets city-level transfer rather than sensor-level clustering. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Graph-based, hierarchical, and attention-based federated traffic prediction methods.}
+\label{tab:fed_graph}
+\small
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
+
+\begin{tabularx}{\textwidth}{p{1.8cm} p{2.2cm} Y Y}
+\toprule
+\textbf{Method} & \textbf{Direction} & \textbf{Architecture / Main Idea} & \textbf{Relevance / Limitation} \\
+\midrule
+
+FedGTP \cite{yang2024fedgtp}
+& Graph-based spatial recovery
+& Federated graph-based prediction with inter-client spatial modeling.
+& Recovers spatial dependencies through graph mechanisms, but increases graph dependence. \\
+
+MFVSTGNN \cite{liu2023mfvstgnn}
+& Multilevel FL
+& Multilevel federated spatio-temporal GNN.
+& Demonstrates multilevel FL value, but relies on a heavier graph backbone. \\
+
+FedTFormer \cite{shuai2025fedtformer}
+& Hierarchical FL + Transformer
+& Hierarchical federated traffic prediction with Transformer modeling.
+& Uses hierarchical FL, but with a more complex Transformer-based architecture. \\
+
+FedHINT \cite{zhou2026fedhint}
+& Hidden global components
+& Recovers hidden global traffic information via proxy nodes.
+& Addresses missing global context, but introduces mechanisms beyond lightweight recurrent FL. \\
+
+FedASTA \cite{chen2024fedasta}
+& Adaptive spatial-temporal attention
+& Server-side adaptive graph construction from client trend patterns; masked spatial attention.
+& Models dynamic spatial-temporal relations, but relies on attention and graph mechanisms with higher complexity. \\
+
+FedGDAN \cite{li2025fedgdan}
+& Graph diffusion attention
+& Graph diffusion attention network with adaptive local aggregation.
+& Privacy-preserving spatial modeling, but introduces graph diffusion overhead. \\
+
+FedDis \cite{zhou2026feddis}
+& Causal disentanglement
+& Dual-branch architecture separating local dynamics from global patterns.
+& Enables personalized prediction, but requires disentanglement and mutual information minimization modules. \\
+
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \section{Research Gap and Thesis Positioning}
 \label{sec:gap}
 
 The reviewed literature shows that FL-based traffic forecasting has advanced along three main directions: improving personalization under non-IID data, reducing communication overhead, and recovering spatial dependencies without centralizing raw sensor observations. However, these directions are often addressed separately rather than within a unified lightweight framework.
 
-Global FL methods such as FedAvg struggle with client drift under heterogeneous traffic distributions. Clustering-based methods improve personalization by grouping similar clients, but many train clusters independently and therefore limit beneficial cross-cluster knowledge transfer. Hierarchical FL methods improve scalability, but often rely on graph neural networks or Transformer-based architectures that increase model complexity. Similarly, graph-based federated methods can recover spatial dependencies, but may require adjacency matrices, proxy-node mechanisms, or additional structural information that complicates deployment.
+Global, sample-count-based FL methods such as FedAvg struggle with client drift under heterogeneous traffic distributions. Clustering-based methods improve personalization by grouping similar clients, but many methods train clusters independently, thereby limiting beneficial cross-cluster knowledge transfer. Hierarchical FL methods improve scalability, but often rely on graph neural networks or Transformer-based architectures that increase model complexity. Similarly, graph-based federated methods can recover spatial dependencies but may require adjacency matrices, proxy-node mechanisms, or additional structural information, which can complicate deployment.
 
 These limitations create a need for a framework that jointly supports:
 

@@ -5,9 +5,9 @@
 
 This thesis proposed a communication-efficient Hierarchical Federated Learning framework for traffic flow prediction in Intelligent Transportation Systems. The framework addresses two central challenges in federated traffic forecasting: the statistical heterogeneity caused by non-IID traffic sensor distributions, and the communication overhead associated with repeated model exchange in bandwidth-constrained edge networks.
 
-The proposed framework integrates four complementary components: (1)~Dynamic Time Warping-based clustering that groups traffic sensors by temporal pattern similarity, reducing intra-cluster data heterogeneity; (2)~a two-tier hierarchical aggregation strategy that combines intra-cluster model specialization with DTW-distance-weighted inter-cluster knowledge sharing; (3)~quality-weighted aggregation that prioritizes client contributions based on local training loss; and (4)~adaptive reliability-based client selection that reduces communication cost by excluding unreliable clients under dynamic availability conditions.
+The proposed framework combines DTW-based sensor clustering, quality-weighted hierarchical aggregation, and adaptive reliability-based client selection. Together, these components aim to reduce intra-cluster heterogeneity, enable controlled inter-cluster knowledge sharing, and lower communication overhead under dynamic client availability.
 
-The framework was evaluated on the METR-LA dataset (207 sensors) through a seven-configuration cumulative ablation study using a lightweight GRU Sequence-to-Sequence model. The final configuration achieved an overall MAE of 3.676~mph, an RMSE of 6.759, and a MAPE of 10.46\%, with a total communication cost of 25.8~GB over 60 communication rounds. Cross-dataset validation on PEMS-BAY (325 sensors) achieved an MAE of 2.052~mph without dataset-specific architectural tuning.
+The framework was evaluated on the METR-LA dataset (207 sensors) through a seven-configuration cumulative ablation study using a lightweight GRU Sequence-to-Sequence model. Multi-seed evaluation (three independent seeds) of the baseline and final configurations provided strong evidence for the robustness of the results: the final configuration achieved a mean MAE of $3.620 \pm 0.049$~mph across seeds, compared with $3.837 \pm 0.015$ for Global FedAvg, a 5.7\% improvement with non-overlapping observed seed ranges. The total communication cost was 25.8~GB over 60 communication rounds. Cross-dataset validation on PEMS-BAY (325 sensors) achieved an MAE of 2.052~mph without dataset-specific architectural tuning.
 
 \section{Answering the Research Questions}
 
@@ -16,7 +16,7 @@ The experimental results presented in Chapter~\ref{ch:results} provide answers t
 \begin{enumerate}
     \item \textbf{Does DTW-based clustering improve prediction accuracy over global FedAvg under non-IID traffic sensor distributions?}
 
-    Yes. The transition from global FedAvg (Run~A, MAE = 3.832) to DTW-clustered models (Run~B, MAE = 3.753) yields a 2.1\% MAE improvement, the largest individual gain in the ablation study. This supports the conclusion that grouping sensors by temporal pattern similarity reduces intra-cluster non-IID divergence and allows cluster models to specialize in similar traffic behaviors.
+    Yes. The transition from global FedAvg (Run~A, MAE = 3.832) to DTW-clustered models (Run~B, MAE = 3.753) yields a 2.1\% MAE improvement, the largest individual gain in the ablation study. Multi-seed evaluation further confirms this finding: across three seeds, the proposed framework achieves a mean MAE of $3.620 \pm 0.049$ compared with $3.837 \pm 0.015$ for Global FedAvg, with non-overlapping observed seed ranges. This supports the conclusion that grouping sensors by temporal pattern similarity reduces intra-cluster non-IID divergence and allows cluster models to specialize in similar traffic behaviors.
 
     \item \textbf{Does hierarchical knowledge sharing between clusters improve accuracy over isolated cluster training?}
 
@@ -26,33 +26,23 @@ The experimental results presented in Chapter~\ref{ch:results} provide answers t
 
     Yes. Adaptive reliability-based client selection (Run~D) reduces total communication by 12.2\% (24.5 $\to$ 21.5~GB) at the cost of only a 0.4\% MAE increase (3.722 $\to$ 3.736). This trade-off is favorable in bandwidth-constrained edge deployments where communication efficiency is a primary objective.
 
-    \item \textbf{Is traffic pattern similarity, measured using DTW, a more effective basis for inter-cluster aggregation than geographic proximity?}
+   \item \textbf{Is traffic pattern similarity, measured using DTW, a more effective basis for inter-cluster aggregation than geographic proximity?}
 
-    The evidence supports this claim, although the improvement is modest. Replacing geographic-distance-based inter-cluster weights with DTW-distance-based weights (Run~E $\to$ Run~F) yields a 0.1\% MAE improvement (3.700 $\to$ 3.696). While small in absolute terms, this change is conceptually consistent with the DTW-based clustering strategy: clusters with similar temporal patterns benefit more from shared model knowledge, regardless of their physical distance.
+    The results provide limited but positive evidence for this claim. Replacing geographic-distance-based inter-cluster weights with DTW-distance-based weights (Run~E $\to$ Run~F) yields a 0.1\% MAE improvement (3.700 $\to$ 3.696). While small in absolute terms and within single-seed random variation, this change is conceptually consistent with the DTW-based clustering strategy: clusters with similar temporal patterns benefit more from shared model knowledge, regardless of their physical distance.
 \end{enumerate}
 
-Taken together, the results provide an affirmative answer to the central research question: \textit{a temporal-pattern-aware hierarchical federated learning framework can improve traffic prediction accuracy while reducing communication cost under non-IID traffic sensor distributions}. The final framework achieves a 4.1\% cumulative MAE improvement over the implemented global FedAvg baseline. It also reduces communication by 29.1\% compared with CMBA-FL, the most directly comparable published federated baseline.
+Taken together, the results provide an affirmative answer to the central research question: \textit{a temporal-pattern-aware hierarchical federated learning framework can improve traffic prediction accuracy while reducing communication cost under non-IID traffic sensor distributions}. Multi-seed evaluation demonstrates a robust 5.7\% mean MAE improvement over the Global FedAvg baseline, with non-overlapping observed seed ranges across three independent seeds. The framework also reduces communication by 29.1\% compared with CMBA-FL, the most directly comparable published federated baseline.
 
-\section{Contributions}
+\section{Concluding Remarks}
 
-The main contributions of this thesis are:
-
-\begin{enumerate}
-    \item \textbf{DTW-based temporal clustering for federated traffic prediction.} The DTW clustering strategy groups traffic sensors by temporal behavioral similarity rather than geographic proximity. The ablation study demonstrates that this is the largest individual contributor to prediction accuracy, providing a 2.1\% MAE improvement by reducing non-IID divergence within clusters.
-
-    \item \textbf{Lightweight hierarchical federated aggregation.} The two-tier aggregation strategy balances cluster specialization with controlled inter-cluster knowledge sharing through DTW-distance-weighted hierarchical synchronization. Together, quality-weighted intra-cluster aggregation and hierarchical synchronization provide a 0.8\% additional MAE improvement without requiring graph adjacency information or heavy architectural components.
-
-    \item \textbf{Adaptive reliability-aware client selection with communication accounting.} The adaptive client selection mechanism reduces per-round communication by 12.2\% by excluding unreliable clients, with only a marginal 0.4\% accuracy trade-off. All communication costs are explicitly tracked and reported throughout the ablation study, enabling direct comparison with published baselines.
-
-    \item \textbf{Comprehensive ablation study and cross-dataset validation.} The seven-configuration cumulative ablation study isolates the contribution of each framework component. The final configuration reduces MAE by 34.8\% compared with FedGRU and by 13.5\% compared with CMBA-FL, while using 29.1\% less communication than CMBA-FL. Cross-dataset validation on PEMS-BAY demonstrates that the framework generalizes without dataset-specific architectural modifications.
-\end{enumerate}
+Overall, this thesis provides evidence that temporal-pattern-aware clustering and lightweight hierarchical aggregation can improve federated traffic speed forecasting under non-IID sensor distributions. The proposed framework achieves robust improvement over Global FedAvg across three seeds and provides a favorable communication--accuracy trade-off compared with recurrent federated baselines. At the same time, the results show that graph-based centralized models still hold an accuracy advantage, motivating future work on privacy-preserving spatial modeling.
 
 \section{Future Work}
 
 Several directions for future research emerge from the limitations identified in Section~\ref{sec:discussion}.
 
 \begin{enumerate}
-    \item \textbf{Incorporating spatial information without centralized graph access.} The proposed framework deliberately avoids graph structure to maintain strict federated data isolation. However, the 14--20\% MAE gap between the proposed framework and centralized graph-based models such as DCRNN and Graph WaveNet suggests that spatial modeling could yield substantial improvements. Future work could explore privacy-preserving spatial mechanisms, such as federated graph construction from local adjacency information or proxy-node representations~\cite{zhou2026fedhint}, that recover spatial dependencies without requiring centralized access to the full graph adjacency matrix.
+    \item \textbf{Incorporating spatial information without centralized graph access.} The proposed framework deliberately avoids graph structure to avoid centralizing raw sensor data and to reduce dependence on global network metadata. However, the 14--20\% MAE gap between the proposed framework and centralized graph-based models such as DCRNN and Graph WaveNet suggests that spatial modeling could provide further improvements. Future work could explore privacy-preserving spatial mechanisms, such as federated graph construction from local adjacency information or proxy-node representations~\cite{zhou2026fedhint}, that recover spatial dependencies without requiring centralized access to the full graph adjacency matrix.
 
     \item \textbf{Dynamic cluster reassignment.} The current DTW-based clustering is performed once before training and remains fixed. In practice, traffic patterns evolve due to seasonal changes, road construction, and policy interventions. Future work could investigate periodic re-clustering during training, triggered by monitoring intra-cluster loss divergence. The key challenge is balancing the potential accuracy gain from adaptive clusters against the additional communication and computation cost of cluster reassignment.
 
